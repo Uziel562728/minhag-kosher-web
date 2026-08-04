@@ -1,26 +1,30 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="es">
   <head>
-    <meta charset="utf-8">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Minhag Kosher</title>
-    <script type="text/javascript">
-      // Single Page Apps for GitHub Pages
-      // MIT License
-      // https://github.com/rafgraph/spa-github-pages
-      // This script checks if there is a redirect in the lookup table
-      // and redirects the user back to the correct path.
-      var firstSegment = window.location.pathname.split('/').filter(Boolean)[0];
-      var pathSegmentsToKeep = (firstSegment && !['admin', 'catalog', 'products', 'login', 'cart'].includes(firstSegment)) ? 1 : 0;
+    <script>
+      (function redirectSinglePageApp() {
+        var location = window.location;
+        var localHosts = ['localhost', '127.0.0.1', '::1'];
+        if (localHosts.indexOf(location.hostname) !== -1) return;
 
-      var l = window.location;
-      var redirectUrl = l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
-        l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') +
-        '/?p=' + l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/').replace(/&/g, '~and~') +
-        (l.search ? '&q=' + l.search.slice(1).replace(/&/g, '~and~') : '') +
-        l.hash;
-      l.replace(redirectUrl);
+        var segments = location.pathname.split('/').filter(Boolean);
+        var isGitHubPages = location.hostname.endsWith('.github.io');
+        var repositoryBase = isGitHubPages && segments.length > 0 ? '/' + segments[0] : '';
+        var route = segments.slice(repositoryBase ? 1 : 0).join('/');
+        var redirectUrl = location.origin + repositoryBase + '/?p=' + encodeURIComponent(route);
+
+        if (location.search) {
+          redirectUrl += '&q=' + encodeURIComponent(location.search.slice(1));
+        }
+
+        location.replace(redirectUrl + location.hash);
+      })();
     </script>
   </head>
   <body>
+    <p>No se encontró la página solicitada.</p>
   </body>
 </html>

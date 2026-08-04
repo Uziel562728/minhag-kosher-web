@@ -1,8 +1,8 @@
 {
   "name": "Minhag Kosher Admin",
   "short_name": "Minhag Admin",
-  "start_url": "/admin",
-  "scope": "/",
+  "start_url": "./admin",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#5E1EAA",

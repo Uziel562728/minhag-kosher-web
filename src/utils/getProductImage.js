@@ -1,4 +1,5 @@
 import { generatedProductImages } from "../config/generatedProductImages";
+import { withBaseUrl } from "./withBaseUrl";
 
 const normalizeText = (value = "") => {
   if (!value) return "";
@@ -76,17 +77,6 @@ const categoryFallbacks = {
   tortas: "images/product-placeholders/tortas.webp",
 };
 
-const withBase = (path) => {
-  if (!path) return '';
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path;
-  }
-  const base = import.meta.env.BASE_URL || '/';
-  const cleanBase = base.endsWith('/') ? base : base + '/';
-  const cleanPath = path.startsWith('/') ? path.slice(1) : path;
-  return cleanBase + cleanPath;
-};
-
 export function hasRealProductImage(product = {}) {
   return typeof product.imagen_principal === "string" && product.imagen_principal.trim().length > 0;
 }
@@ -100,7 +90,7 @@ export function getProductImage(product = {}) {
   const generatedImage = generatedProductImages[productSlug];
 
   if (generatedImage) {
-    return withBase(generatedImage);
+    return withBaseUrl(generatedImage);
   }
 
   const name = normalizeText(product.nombre);
@@ -110,7 +100,7 @@ export function getProductImage(product = {}) {
   );
 
   if (matchingRule) {
-    return withBase(matchingRule.image);
+    return withBaseUrl(matchingRule.image);
   }
 
   const categorySlug = normalizeText(
@@ -120,5 +110,5 @@ export function getProductImage(product = {}) {
   );
 
   const fallbackPath = categoryFallbacks[categorySlug] || "images/product-placeholders/default.webp";
-  return withBase(fallbackPath);
+  return withBaseUrl(fallbackPath);
 }

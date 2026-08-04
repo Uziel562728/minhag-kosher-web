@@ -23,6 +23,7 @@ const AdminCategories = lazy(() => import('./components/admin/AdminCategories'))
 const AdminCategoryForm = lazy(() => import('./components/admin/AdminCategoryForm'));
 
 const RouteFallback = () => <div className="catalog-loading-inner"><div className="admin-spinner" /><p>Cargando...</p></div>;
+const routerBase = import.meta.env.BASE_URL.replace(/\/$/, '');
 
 function ScrollManager() {
   const location = useLocation();
@@ -113,7 +114,7 @@ function PublicLayout() {
 
 export default function App() {
   return (
-    <Router basename={import.meta.env.BASE_URL}>
+    <Router basename={routerBase || '/'}>
       <ScrollManager />
       <CartProvider>
         <Suspense fallback={<RouteFallback />}><Routes>

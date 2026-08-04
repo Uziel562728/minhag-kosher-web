@@ -2,21 +2,32 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.jsx'
+import AppErrorBoundary, { ApplicationErrorFallback } from './components/AppErrorBoundary.jsx'
+import { supabaseConfigurationError } from './supabaseClient.js'
 
 // SPA redirect handler for GitHub Pages fallback
 (function() {
-  const redirect = new URLSearchParams(window.location.search).get('p');
+  const redirectParams = new URLSearchParams(window.location.search);
+  const redirect = redirectParams.get('p');
   if (redirect) {
-    const cleanRedirect = '/' + redirect.replace(/~and~/g, '&').replace(/^\/+/, '');
-    const cleanSearch = new URLSearchParams(window.location.search).get('q');
-    const finalSearch = cleanSearch ? '?' + cleanSearch.replace(/~and~/g, '&') : '';
-    const finalUrl = `${import.meta.env.BASE_URL}${cleanRedirect.substring(1)}${finalSearch}${window.location.hash}`;
-    window.history.replaceState(null, null, finalUrl);
+    const cleanRedirect = redirect.replace(/~and~/g, '&').replace(/^\/+/, '');
+    const redirectedSearch = redirectParams.get('q');
+    const finalSearch = redirectedSearch ? `?${redirectedSearch.replace(/~and~/g, '&')}` : '';
+    const finalUrl = `${import.meta.env.BASE_URL}${cleanRedirect}${finalSearch}${window.location.hash}`;
+    window.history.replaceState(null, '', finalUrl);
   }
 })();
 
-createRoot(document.getElementById('root')).render(
+const root = createRoot(document.getElementById('root'));
+
+root.render(
   <StrictMode>
-    <App />
+    {supabaseConfigurationError ? (
+      <ApplicationErrorFallback message="No se pudo cargar el catálogo. Intentá nuevamente más tarde." />
+    ) : (
+      <AppErrorBoundary>
+        <App />
+      </AppErrorBoundary>
+    )}
   </StrictMode>,
-)
+);

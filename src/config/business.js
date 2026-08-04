@@ -1,3 +1,5 @@
+import { withBaseUrl } from '../utils/withBaseUrl';
+
 export const business = {
   name: "Minhag Kosher",
   category: "Panadería y confitería kosher",
@@ -31,7 +33,7 @@ export const business = {
     },
   ],
   instagram: "https://www.instagram.com/minhagkosher/",
-  logo: "/images/minhag-logo-transparent.png",
+  logo: withBaseUrl("images/minhag-logo-transparent.png"),
   services: ["Menú en el día", "Servicio de catering", "Delivery"],
   coordinates: {
     lat: -34.6248754,
