@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { clearCachedCatalog } from '../../lib/catalogCache';
+import { Pencil, Trash2 } from 'lucide-react';
 
 export default function AdminCategories() {
   const [categories, setCategories] = useState([]);
@@ -40,12 +41,29 @@ export default function AdminCategories() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta categoría? Esto podría afectar a los productos vinculados.')) return;
-
+  const handleDelete = async (id, nombre) => {
     setDeletingId(id);
     setErrorMsg('');
     try {
+      // Check if there are products associated with this category
+      const { count, error: countError } = await supabase
+        .from('products')
+        .select('*', { count: 'exact', head: true })
+        .eq('categoria_id', id);
+
+      if (countError) throw countError;
+
+      if (count && count > 0) {
+        alert(`No se puede eliminar la categoría porque tiene ${count} producto(s) asociado(s). Primero debes reasignar o eliminar los productos vinculados.`);
+        setDeletingId(null);
+        return;
+      }
+
+      if (!window.confirm(`¿Seguro que querés eliminar la categoría '${nombre}'? Esta acción no se puede deshacer.`)) {
+        setDeletingId(null);
+        return;
+      }
+
       const { error } = await supabase
         .from('categories')
         .delete()
@@ -58,8 +76,6 @@ export default function AdminCategories() {
       console.error('Error al eliminar la categoría de Supabase:', {
         message: err.message || err,
         code: err.code || 'N/A',
-        details: err.details || 'N/A',
-        hint: err.hint || 'N/A',
         stack: err.stack
       });
       setErrorMsg('No se pudo eliminar la categoría de la base de datos.');
@@ -80,7 +96,7 @@ export default function AdminCategories() {
   return (
     <div className="admin-categories-view">
       <div className="view-action-header">
-        <h3>Categorías del Supermercado ({categories.length})</h3>
+        <h3>Categorías ({categories.length})</h3>
         <button 
           onClick={() => navigate('/admin/categories/new')} 
           className="btn btn-primary btn-add"
@@ -91,8 +107,8 @@ export default function AdminCategories() {
 
       {errorMsg && <div className="admin-error-alert">{errorMsg}</div>}
 
-      {/* Categories Table */}
-      <div className="table-responsive">
+      {/* Categories Table (Desktop View) */}
+      <div className="table-responsive admin-desktop-only">
         <table className="admin-table">
           <thead>
             <tr>
@@ -130,19 +146,21 @@ export default function AdminCategories() {
                     <div className="table-actions">
                       <button
                         onClick={() => navigate(`/admin/categories/edit/${cat.id}`)}
-                        className="btn-action btn-edit"
-                        title="Editar"
+                        className="admin-icon-button admin-icon-button--edit"
+                        title="Editar categoría"
+                        aria-label="Editar categoría"
                         disabled={deletingId === cat.id}
                       >
-                        ✏️
+                        <Pencil size={18} aria-hidden="true" />
                       </button>
                       <button
-                        onClick={() => handleDelete(cat.id)}
-                        className="btn-action btn-delete"
-                        title="Eliminar"
+                        onClick={() => handleDelete(cat.id, cat.nombre)}
+                        className="admin-icon-button admin-icon-button--delete"
+                        title="Eliminar categoría"
+                        aria-label="Eliminar categoría"
                         disabled={deletingId === cat.id}
                       >
-                        🗑️
+                        <Trash2 size={18} aria-hidden="true" />
                       </button>
                     </div>
                   </td>
@@ -151,6 +169,41 @@ export default function AdminCategories() {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Categories Cards (Mobile View) */}
+      <div className="admin-mobile-only category-mobile-list">
+        {categories.length === 0 ? (
+          <div className="empty-table-row" style={{ color: '#aeb7c6', fontStyle: 'italic', padding: '40px', textAlign: 'center' }}>
+            No se encontraron categorías en la base de datos.
+          </div>
+        ) : (
+          categories.map((cat) => (
+            <div key={cat.id} className="category-mobile-card">
+              <div className="category-mobile-name">{cat.nombre}</div>
+              <div className="category-mobile-actions">
+                <button
+                  onClick={() => navigate(`/admin/categories/edit/${cat.id}`)}
+                  className="category-mobile-action category-mobile-action--edit"
+                  title={`Editar categoría ${cat.nombre}`}
+                  aria-label={`Editar categoría ${cat.nombre}`}
+                  disabled={deletingId === cat.id}
+                >
+                  <Pencil size={17} aria-hidden="true" /> Editar
+                </button>
+                <button
+                  onClick={() => handleDelete(cat.id, cat.nombre)}
+                  className="category-mobile-action category-mobile-action--delete"
+                  title={`Eliminar categoría ${cat.nombre}`}
+                  aria-label={`Eliminar categoría ${cat.nombre}`}
+                  disabled={deletingId === cat.id}
+                >
+                  <Trash2 size={17} aria-hidden="true" /> Eliminar
+                </button>
+              </div>
+            </div>
+          ))
+        )}
       </div>
     </div>
   );

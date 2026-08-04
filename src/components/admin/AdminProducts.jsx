@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { clearCachedCatalog } from '../../lib/catalogCache';
+import { Pencil, Trash2 } from 'lucide-react';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -53,8 +54,8 @@ export default function AdminProducts() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este producto?')) return;
+  const handleDelete = async (id, nombre) => {
+    if (!window.confirm(`¿Seguro que querés eliminar '${nombre}'? Esta acción no se puede deshacer.`)) return;
     
     setDeletingId(id);
     setErrorMsg('');
@@ -206,19 +207,21 @@ export default function AdminProducts() {
                     <div className="table-actions">
                       <button
                         onClick={() => navigate(`/admin/products/edit/${prod.id}`)}
-                        className="btn-action btn-edit"
-                        title="Editar"
+                        className="admin-icon-button admin-icon-button--edit"
+                        title="Editar producto"
+                        aria-label="Editar producto"
                         disabled={deletingId === prod.id}
                       >
-                        ✏️
+                        <Pencil size={18} aria-hidden="true" />
                       </button>
                       <button
-                        onClick={() => handleDelete(prod.id)}
-                        className="btn-action btn-delete"
-                        title="Eliminar"
+                        onClick={() => handleDelete(prod.id, prod.nombre)}
+                        className="admin-icon-button admin-icon-button--delete"
+                        title="Eliminar producto"
+                        aria-label="Eliminar producto"
                         disabled={deletingId === prod.id}
                       >
-                        🗑️
+                        <Trash2 size={18} aria-hidden="true" />
                       </button>
                     </div>
                   </td>

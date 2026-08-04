@@ -40,12 +40,6 @@ export default function AdminDashboard() {
         </div>
         <nav className="sidebar-nav">
           <NavLink 
-            to="/admin/orders" 
-            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-          >
-            📋 Pedidos
-          </NavLink>
-          <NavLink 
             to="/admin/products" 
             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
           >
@@ -56,12 +50,6 @@ export default function AdminDashboard() {
             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
           >
             🏷️ Categorías
-          </NavLink>
-          <NavLink 
-            to="/admin/push-notifications" 
-            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
-          >
-            🔔 Notificaciones
           </NavLink>
         </nav>
         <div className="sidebar-footer">
@@ -88,13 +76,6 @@ export default function AdminDashboard() {
       {/* Mobile Bottom Navigation Bar (only visible on mobile via CSS) */}
       <nav className="admin-mobile-bottom-nav">
         <NavLink 
-          to="/admin/orders" 
-          className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
-        >
-          <span className="mobile-nav-icon">📋</span>
-          <span className="mobile-nav-label">Pedidos</span>
-        </NavLink>
-        <NavLink 
           to="/admin/products" 
           className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
         >
@@ -107,13 +88,6 @@ export default function AdminDashboard() {
         >
           <span className="mobile-nav-icon">🏷️</span>
           <span className="mobile-nav-label">Categorías</span>
-        </NavLink>
-        <NavLink 
-          to="/admin/push-notifications" 
-          className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
-        >
-          <span className="mobile-nav-icon">🔔</span>
-          <span className="mobile-nav-label">Notif.</span>
         </NavLink>
       </nav>
     </div>
