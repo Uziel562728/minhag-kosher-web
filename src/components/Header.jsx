@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoImg from '../images/minhag-logo-transparent.png';
+import logoImg from '../images/minhag-logo-original.jpg';
 
 export default function Header() {
   const navigate = useNavigate();
