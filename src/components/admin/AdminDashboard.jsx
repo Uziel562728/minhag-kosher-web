@@ -19,7 +19,7 @@ export default function AdminDashboard() {
       {/* Mobile Top Header (only visible on mobile via CSS) */}
       <header className="admin-mobile-header">
         <div className="mobile-brand">
-          <h3>Super Market Kosher</h3>
+          <h3>Minhag Kosher</h3>
           <span>Admin</span>
         </div>
         <div className="mobile-header-actions">
@@ -35,7 +35,7 @@ export default function AdminDashboard() {
       {/* Admin Sidebar Navigation (visible on desktop, hidden on mobile) */}
       <aside className="admin-sidebar">
         <div className="sidebar-brand">
-          <h3>Super Market Kosher</h3>
+          <h3>Minhag Kosher</h3>
           <span>Administración</span>
         </div>
         <nav className="sidebar-nav">

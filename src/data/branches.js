@@ -1,15 +1,17 @@
+import { business } from '../config/business';
+
 export const branches = [
   {
     id: 'branch-1',
-    nombre: 'SUPER MARKET KOSHER',
-    direccion: 'Dr. Juan Felipe Aranguren 2866, Flores, Ciudad Autónoma de Buenos Aires',
+    nombre: business.name.toUpperCase(),
+    direccion: business.address.full,
     isKosher: true,
     coordenadas: {
-      lat: -34.625149,
-      lng: -58.4715794
+      lat: business.coordinates.lat,
+      lng: business.coordinates.lng
     },
-    googleMapsUrl: 'https://maps.app.goo.gl/Xaggm8j91K28eYKf7',
-    comoLlegarUrl: 'https://www.google.com/maps/dir/?api=1&destination=-34.625149,-58.4715794'
+    googleMapsUrl: business.googleMapsUrl,
+    comoLlegarUrl: business.comoLlegarUrl
   }
 ];
 

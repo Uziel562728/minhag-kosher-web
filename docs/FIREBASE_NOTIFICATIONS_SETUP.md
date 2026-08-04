@@ -1,6 +1,6 @@
 # Guía de Configuración de Notificaciones Web Push (Firebase Cloud Messaging + Supabase)
 
-Esta guía detalla los pasos para configurar las notificaciones web push en **Super Market Kosher**, permitiendo que el administrador reciba avisos instantáneos ante nuevos pedidos en su celular o computadora.
+Esta guía detalla los pasos para configurar las notificaciones web push en **Minhag Kosher**, permitiendo que el administrador reciba avisos instantáneos ante nuevos pedidos en su celular o computadora.
 
 ---
 
@@ -17,9 +17,9 @@ Esta guía detalla los pasos para configurar las notificaciones web push en **Su
 ## Paso 1: Configurar Firebase Console
 
 1. Entrá a [Firebase Console](https://console.firebase.google.com/) e iniciá sesión con tu cuenta de Google.
-2. Hacé clic en **Agregar proyecto** (o selecciona uno existente). Ponle un nombre (ej. `Super Market Pedidos`) y completa los pasos. Podés desactivar Google Analytics para simplificar la configuración.
+2. Hacé clic en **Agregar proyecto** (o selecciona uno existente). Ponle un nombre (ej. `Minhag Kosher Pedidos`) y completa los pasos. Podés desactivar Google Analytics para simplificar la configuración.
 3. En el panel principal del proyecto, hacé clic en el ícono de **Web (</>)** para registrar una aplicación.
-4. Escribí un apodo para la aplicación (ej. `super-market-web`) y haz clic en **Registrar app**.
+4. Escribí un apodo para la aplicación (ej. `minhag-kosher-web`) y haz clic en **Registrar app**.
 5. Copiá el objeto `firebaseConfig` que aparece en pantalla:
    ```javascript
    const firebaseConfig = {

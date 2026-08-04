@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { branches, isKosherClosedForShabat } from '../data/branches';
-import logoImg from '../images/logo supermarket.webp';
+import logoImg from '../images/minhag-logo-transparent.png';
 
 export default function BranchMap({ activeBranchId, onSelectBranch }) {
   const mapContainerRef = useRef(null);
@@ -12,9 +12,9 @@ export default function BranchMap({ activeBranchId, onSelectBranch }) {
   useEffect(() => {
     if (!mapContainerRef.current) return;
 
-    // Center coordinates for Buenos Aires
-    const defaultCenter = [-34.595, -58.435];
-    const defaultZoom = 12;
+    // Center coordinates directly on the branch (Terrada 592)
+    const defaultCenter = [branches[0].coordenadas.lat, branches[0].coordenadas.lng];
+    const defaultZoom = 16;
 
     // 1. Initialize Map
     const map = L.map(mapContainerRef.current, {

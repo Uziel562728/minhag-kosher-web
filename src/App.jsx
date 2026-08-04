@@ -7,7 +7,7 @@ import Contact from './components/Contact';
 import WhatsAppButton from './components/WhatsAppButton';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
-import logoImg from './images/logo supermarket.webp';
+import logoImg from './images/minhag-logo-transparent.png';
 import './App.css';
 
 // Admin imports
@@ -80,7 +80,7 @@ function PublicLayout() {
     <div className="app-container">
       {/* Background Watermark Logo */}
       <div className="bg-watermark">
-        <img src={logoImg} alt="Super Market Kosher Watermark" />
+        <img src={logoImg} alt="Minhag Kosher Watermark" />
       </div>
 
       {/* Global background diagonal animated lines */}

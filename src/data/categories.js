@@ -1,7 +1,7 @@
 export const categories = [
-  { id: 'almacen', name: 'Almacén', icon: '🍞' },
-  { id: 'bebidas', name: 'Bebidas', icon: '🥤' },
-  { id: 'limpieza', name: 'Limpieza', icon: '🧼' },
-  { id: 'perfumeria', name: 'Perfumería', icon: '🧴' },
-  { id: 'snacks', name: 'Snacks', icon: '🍿' }
+  { id: 'panaderia', name: 'Panadería y Panes', icon: '🍞' },
+  { id: 'pasteleria', name: 'Pastelería y Tortas', icon: '🍰' },
+  { id: 'facturas', name: 'Facturas y Bizcochos', icon: '🥐' },
+  { id: 'especialidades', name: 'Especialidades Kosher', icon: '✡️' },
+  { id: 'bebidas', name: 'Bebidas e Infusiones', icon: '☕' }
 ];

@@ -1,5 +1,7 @@
 import React from 'react';
-import logoImg from '../images/logo supermarket.webp';
+import logoImg from '../images/minhag-logo-transparent.png';
+import { motion } from 'motion/react';
+import { business } from '../config/business';
 
 export default function Hero() {
   const scrollToSection = (id) => {
@@ -20,7 +22,7 @@ export default function Hero() {
     <section id="home" className="hero-section">
       <div className="hero-glow"></div>
       
-      {/* Animated diagonal red background lines */}
+      {/* Animated diagonal background lines */}
       <div className="hero-diagonal-lines">
         <div className="diagonal-line line-1"></div>
         <div className="diagonal-line line-2"></div>
@@ -31,21 +33,77 @@ export default function Hero() {
       </div>
 
       <div className="hero-container">
-        <div className="hero-content">
+        <motion.div 
+          className="hero-content"
+          initial={{ opacity: 0, y: 35 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8, ease: "easeOut" }}
+        >
           <div className="hero-logo-slot">
-            <div className="hero-logo-wrapper">
-              <img src={logoImg} alt="Super Market Kosher" className="hero-logo-large" />
-            </div>
+            <motion.div 
+              className="hero-logo-wrapper"
+              initial={{ scale: 0.85, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ delay: 0.2, duration: 0.6, type: "spring" }}
+            >
+              <img src={logoImg} alt={business.name} className="hero-logo-large" />
+            </motion.div>
           </div>
-          <div className="hero-actions">
+          
+          <motion.h1 
+            className="hero-title"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4, duration: 0.6 }}
+          >
+            <span className="highlight">{business.name}</span>
+          </motion.h1>
+
+          <motion.p 
+            className="hero-subtitle"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.5, duration: 0.6 }}
+          >
+            {business.description}
+          </motion.p>
+
+          {business.supervision && (
+            <motion.div 
+              className="hero-supervision-badge"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.6, duration: 0.5 }}
+              style={{
+                display: 'inline-block',
+                backgroundColor: 'rgba(94, 30, 170, 0.1)',
+                color: 'var(--primary)',
+                padding: '8px 16px',
+                borderRadius: 'var(--radius-full)',
+                fontWeight: '600',
+                fontSize: '0.9rem',
+                marginBottom: '24px',
+                border: '1px solid rgba(94, 30, 170, 0.2)'
+              }}
+            >
+              ✡️ Supervisión: {business.supervision}
+            </motion.div>
+          )}
+
+          <motion.div 
+            className="hero-actions"
+            initial={{ opacity: 0, y: 15 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.7, duration: 0.5 }}
+          >
             <button onClick={() => scrollToSection('catalog')} className="btn btn-primary btn-large">
               Ver Productos
             </button>
             <button onClick={() => scrollToSection('contact')} className="btn btn-secondary btn-large">
               Ver Sucursal
             </button>
-          </div>
-        </div>
+          </motion.div>
+        </motion.div>
       </div>
     </section>
   );

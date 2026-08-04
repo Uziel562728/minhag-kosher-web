@@ -20,7 +20,7 @@ const CACHE_TTL_MS = 5 * 60 * 1000;
 // ==========================================
 // 2. INDEXEDDB PERSISTENCE (L2 Cache)
 // ==========================================
-const DB_NAME = 'SupermarketKosherCacheDB';
+const DB_NAME = 'MinhagKosherCacheDB';
 const DB_VERSION = 1;
 const STORE_PRODUCTS = 'products';
 const STORE_CATALOG = 'catalog';

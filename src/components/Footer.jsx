@@ -1,6 +1,7 @@
 import React from 'react';
 import { contactConfig, getWhatsAppLink } from '../data/contactConfig';
-import logoImg from '../images/logo supermarket.webp';
+import { business } from '../config/business';
+import logoImg from '../images/minhag-logo-transparent.png';
 
 const WhatsAppIcon = () => (
   <svg 
@@ -15,6 +16,13 @@ const WhatsAppIcon = () => (
 export default function Footer() {
   const defaultWhatsApp = contactConfig.whatsAppNumbers.find(w => w.isDefault) || contactConfig.whatsAppNumbers[0];
   const whatsappUrl = getWhatsAppLink(defaultWhatsApp.numberApi, defaultWhatsApp.defaultMessage);
+
+  const handleWaClick = (e, url) => {
+    if (url === '#') {
+      e.preventDefault();
+      alert('El número de WhatsApp todavía no está configurado.');
+    }
+  };
 
   const scrollToSection = (id) => {
     const element = document.getElementById(id);
@@ -36,12 +44,16 @@ export default function Footer() {
         {/* Brand Info */}
         <div className="footer-brand">
           <div className="footer-logo">
-            <img src={logoImg} alt="Super Market Kosher" className="logo-img-footer" />
+            <img src={logoImg} alt={business.name} className="logo-img-footer" />
           </div>
           <p className="footer-tagline">
-            Tu supermercado de confianza en la Ciudad Autónoma de Buenos Aires. Variedad, calidad y las mejores ofertas cerca tuyo.
+            {business.description}
           </p>
-
+          {business.supervision && (
+            <p className="footer-supervision" style={{ marginTop: '10px', fontSize: '0.85rem', color: 'var(--accent)', fontWeight: '600' }}>
+              ✓ Supervisión: {business.supervision}
+            </p>
+          )}
         </div>
 
         {/* Quick Links */}
@@ -55,15 +67,16 @@ export default function Footer() {
           </ul>
         </div>
 
-        {/* Support & Legal */}
+        {/* Support & Contact */}
         <div className="footer-links-group">
           <h4>Contacto</h4>
           <ul>
             <li>
               <a 
                 href={whatsappUrl} 
-                target="_blank" 
-                rel="noopener noreferrer" 
+                onClick={(e) => handleWaClick(e, whatsappUrl)}
+                target={whatsappUrl !== '#' ? "_blank" : undefined}
+                rel={whatsappUrl !== '#' ? "noopener noreferrer" : undefined}
                 className="footer-link ws-footer-link"
                 style={{ display: 'inline-flex', alignItems: 'center' }}
               >
@@ -77,13 +90,13 @@ export default function Footer() {
                 </a>
               </li>
             ))}
-            <li className="footer-text-muted">📍 Sucursal en Flores, CABA</li>
+            <li className="footer-text-muted">📍 {business.address.street}, {business.address.neighborhood}, CABA</li>
           </ul>
         </div>
       </div>
 
       <div className="footer-bottom">
-        <p>&copy; {new Date().getFullYear()} Super Market Kosher. Todos los derechos reservados.</p>
+        <p>&copy; {new Date().getFullYear()} {business.name}. Todos los derechos reservados.</p>
       </div>
     </footer>
   );

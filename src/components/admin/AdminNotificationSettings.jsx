@@ -134,7 +134,7 @@ export default function AdminNotificationSettings() {
           try {
             const errorBody = await error.context.json();
             errorMsg = errorBody.error || errorBody.message || errorMsg;
-          } catch (_) {}
+          } catch {}
         }
         throw new Error(errorMsg);
       }
@@ -182,7 +182,7 @@ export default function AdminNotificationSettings() {
       } else {
         window.location.href = url;
       }
-    } catch (_) {
+    } catch {
       window.location.href = url;
     }
   };

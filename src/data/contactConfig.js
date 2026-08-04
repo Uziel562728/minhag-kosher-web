@@ -1,22 +1,22 @@
+import { business } from '../config/business';
+
 export const contactConfig = {
-  whatsAppNumbers: [
-    {
-      id: 'main',
-      label: 'WhatsApp Consultas',
-      numberDisplay: '+54 9 11 2328 7769',
-      numberApi: '5491123287769', // Properly formatted API number (Argentina country code + 9 + mobile area code + number)
-      defaultMessage: 'Hola Super Market Kosher, quería hacer una consulta.',
-      isDefault: true
-    }
-  ],
+  whatsAppNumbers: business.whatsapp.map((w, idx) => ({
+    id: w.id,
+    label: w.label,
+    numberDisplay: w.displayNumber || w.localNumber,
+    numberApi: w.internationalNumber,
+    defaultMessage: `Hola ${business.name}, quería hacer una consulta.`,
+    isDefault: idx === 0
+  })),
   socialMedia: {
-    instagramGeneral: '', // Prepared for general main Instagram account
+    instagramGeneral: business.instagram,
     instagrams: [
       {
         id: 'kosher',
-        label: '@supermarketkosher',
-        url: 'https://www.instagram.com/supermarketkosher',
-        branchId: 'branch-1' // Linked to the single branch
+        label: `@${business.instagram.split('/').filter(Boolean).pop() || 'minhagkosher'}`,
+        url: business.instagram,
+        branchId: 'branch-1'
       }
     ],
     facebook: '',  // Prepared for future Facebook URL
@@ -29,9 +29,11 @@ export const contactConfig = {
  * Helper function to generate a WhatsApp API link.
  * @param {string} apiNumber - Clean number (e.g. 5491134213919)
  * @param {string} message - Text message to pre-fill
- * @returns {string} Fully formed WhatsApp API link
+ * @returns {string} Fully formed WhatsApp API link or '#' if not configured
  */
 export function getWhatsAppLink(apiNumber, message) {
+  if (!apiNumber) return '#';
+  const cleanPhone = apiNumber.replace(/[^0-9]/g, '');
   const encodedText = encodeURIComponent(message || '');
-  return `https://wa.me/${apiNumber}?text=${encodedText}`;
+  return `https://wa.me/${cleanPhone}?text=${encodedText}`;
 }

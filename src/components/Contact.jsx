@@ -1,6 +1,7 @@
 import React from 'react';
 import { contactConfig, getWhatsAppLink } from '../data/contactConfig';
 import { branches, isKosherClosedForShabat } from '../data/branches';
+import { business } from '../config/business';
 import BranchMap from './BranchMap';
 
 const WhatsAppIcon = () => (
@@ -14,8 +15,6 @@ const WhatsAppIcon = () => (
 );
 
 export default function Contact() {
-  const defaultWhatsApp = contactConfig.whatsAppNumbers.find(w => w.isDefault) || contactConfig.whatsAppNumbers[0];
-  const whatsappUrl = getWhatsAppLink(defaultWhatsApp.numberApi, defaultWhatsApp.defaultMessage);
   const isShabat = isKosherClosedForShabat();
   const singleBranch = branches[0];
 
@@ -54,8 +53,9 @@ export default function Contact() {
                 rel="noopener noreferrer" 
                 className="btn btn-secondary btn-small"
                 style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}
+                aria-label={`Ver ruta hacia ${singleBranch.nombre} en Google Maps`}
               >
-                🗺️ Ver en Google Maps
+                🗺️ Cómo llegar (Google Maps)
               </a>
             </div>
           </div>
@@ -64,84 +64,104 @@ export default function Contact() {
         {/* Right Column: Contact info & Hours */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           
-          {/* Vías de Contacto */}
+          {/* Canales de Contacto */}
           <div className="contact-info-card" style={{ padding: '30px' }}>
             <h3 style={{ fontSize: '1.3rem', fontWeight: '700', marginBottom: '20px', color: 'var(--text-title)' }}>
               Canales de Venta y Consultas
             </h3>
 
-            <div className="contact-methods" style={{ marginBottom: '24px', gap: '16px' }}>
-              {/* WhatsApp Method */}
-              <div className="contact-method-item">
-                <span className="method-icon ws-color" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <WhatsAppIcon />
-                </span>
-                <div className="method-details">
-                  <strong>WhatsApp Ventas / Consultas</strong>
-                  <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="method-link">
-                    {defaultWhatsApp.numberDisplay}
-                  </a>
-                </div>
-              </div>
+            <div className="contact-methods" style={{ marginBottom: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {/* WhatsApp Channels */}
+              {contactConfig.whatsAppNumbers.map((wa) => {
+                const waUrl = getWhatsAppLink(wa.numberApi, wa.defaultMessage);
+                return (
+                  <div key={wa.id} className="contact-method-item" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span className="method-icon ws-color" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#e8fced', color: '#25d366', padding: '10px', borderRadius: '50%' }}>
+                      <WhatsAppIcon />
+                    </span>
+                    <div className="method-details">
+                      <strong style={{ display: 'block', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{wa.label}</strong>
+                      <a 
+                        href={waUrl} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="method-link" 
+                        style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-title)' }}
+                      >
+                        {wa.numberDisplay}
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
 
-              {/* Instagram Methods */}
+              {/* Instagram Method */}
               {contactConfig.socialMedia.instagrams && contactConfig.socialMedia.instagrams.map((ig) => (
-                <div key={ig.id} className="contact-method-item">
-                  <span className="method-icon ig-color">📸</span>
+                <div key={ig.id} className="contact-method-item" style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <span className="method-icon ig-color" style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#ffeef4', color: '#e1306c', padding: '10px', borderRadius: '50%', fontSize: '1.2rem' }}>📸</span>
                   <div className="method-details">
-                    <strong>Instagram {ig.label}</strong>
+                    <strong style={{ display: 'block', fontSize: '0.9rem', color: 'var(--text-muted)' }}>Instagram Oficial</strong>
                     <a 
                       href={ig.url} 
                       target="_blank" 
                       rel="noopener noreferrer" 
                       className="method-link ig-link"
+                      style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-title)' }}
                     >
-                      Ver perfil
+                      {ig.label}
                     </a>
                   </div>
                 </div>
               ))}
             </div>
 
-            <div className="contact-cta-wrapper">
-              <a 
-                href={whatsappUrl} 
-                target="_blank" 
-                rel="noopener noreferrer" 
-                className="btn btn-whatsapp btn-large"
-                style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}
-              >
-                <WhatsAppIcon /> Enviar Mensaje de WhatsApp
-              </a>
+            <div className="contact-cta-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              {business.whatsapp.map((wa) => {
+                const message = encodeURIComponent("Hola, Minhag Kosher. Quisiera realizar una consulta.");
+                const url = `https://wa.me/${wa.internationalNumber}?text=${message}`;
+                return (
+                  <a 
+                    key={wa.id}
+                    href={url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="btn btn-whatsapp btn-large"
+                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}
+                    aria-label={`Enviar mensaje de consulta a ${wa.label} por WhatsApp`}
+                  >
+                    <WhatsAppIcon /> Enviar a {wa.label} ({wa.displayNumber})
+                  </a>
+                );
+              })}
             </div>
           </div>
 
           {/* Horarios de Atención Card */}
           <div className="contact-hours-card" style={{ padding: '30px', flex: '1' }}>
-            <h3 style={{ margin: '0 0 16px 0', fontSize: '1.3rem' }}>Horarios de Atención</h3>
+            <h3 style={{ margin: '0 0 16px 0', fontSize: '1.3rem', color: 'var(--text-title)' }}>Horarios de Atención</h3>
             <div className="hours-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
+              <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                 <span>Lunes a Jueves:</span>
                 <strong>08:00 a 19:30 hs</strong>
               </div>
-              <div className={`hours-item ${isShabat ? 'active-shabat-hours' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
+              <div className={`hours-item ${isShabat ? 'active-shabat-hours' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                 <span>Viernes:</span>
                 {isShabat ? (
-                  <strong className="shabat-highlight">⚠️ 08:00 a 16:00 hs (Cerrado por Shabat)</strong>
+                  <strong className="shabat-highlight" style={{ color: 'var(--primary)' }}>⚠️ 08:00 a 16:00 hs (Cerrado por Shabat)</strong>
                 ) : (
                   <strong>08:00 a 16:00 hs</strong>
                 )}
               </div>
-              <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px' }}>
+              <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                 <span>Sábados:</span>
-                <strong className={isShabat ? 'shabat-highlight' : ''}>Cerrado por Shabat</strong>
+                <strong className={isShabat ? 'shabat-highlight' : ''} style={{ color: isShabat ? 'var(--primary)' : 'inherit' }}>Cerrado por Shabat</strong>
               </div>
               <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '4px' }}>
                 <span>Domingos:</span>
                 <strong>08:30 a 14:00 hs</strong>
               </div>
             </div>
-            <div className="contact-promo-footer" style={{ marginTop: '16px', fontSize: '0.9rem', opacity: '0.9' }}>
+            <div className="contact-promo-footer" style={{ marginTop: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>
               🏪 ¡Te esperamos en Flores!
             </div>
           </div>

@@ -1,26 +1,26 @@
 @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
 
 :root {
-  /* Color Palette */
-  --primary: #e53e3e;
-  --primary-hover: #c53030;
-  --primary-light: #fff5f5;
-  --secondary: #0f172a;
-  --secondary-hover: #1e293b;
-  --accent: #f59e0b;
-  --accent-light: #fef3c7;
+  /* Color Palette - Minhag Kosher */
+  --primary: #5e1eaa; /* Deep purple from logo */
+  --primary-hover: #4c158d;
+  --primary-light: #f3ebff;
+  --secondary: #fabe46; /* Golden yellow from logo */
+  --secondary-hover: #e8ac33;
+  --accent: #ff7b00; /* Warm orange */
+  --accent-light: #fff3e6;
   --whatsapp: #25d366;
   --whatsapp-hover: #20ba5a;
   --whatsapp-light: #e8fced;
   
   /* Neutral Colors */
-  --bg-app: #f8fafc;
+  --bg-app: #fbfafd; /* Very soft purplish tint */
   --bg-card: #ffffff;
-  --text-main: #1e293b;
-  --text-title: #0f172a;
-  --text-muted: #64748b;
-  --border: #e2e8f0;
-  --border-hover: #cbd5e1;
+  --text-main: #1e132c; /* Deep dark purple-brown */
+  --text-title: #0f051b;
+  --text-muted: #68597c;
+  --border: #e8def3;
+  --border-hover: #dcd0ec;
   
   /* Fonts */
   --font-family: 'Outfit', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -59,10 +59,10 @@ html {
 body {
   font-family: var(--font-family);
   background:
-    radial-gradient(circle at 10% 16%, rgba(239, 68, 68, 0.20), transparent 34%),
-    radial-gradient(circle at 90% 32%, rgba(245, 158, 11, 0.17), transparent 32%),
-    radial-gradient(circle at 42% 78%, rgba(59, 130, 246, 0.13), transparent 42%),
-    linear-gradient(135deg, #fff1f2 0%, #f1f5f9 46%, #ffedd5 100%);
+    radial-gradient(circle at 10% 16%, rgba(94, 30, 170, 0.12), transparent 34%),
+    radial-gradient(circle at 90% 32%, rgba(250, 190, 70, 0.12), transparent 32%),
+    radial-gradient(circle at 42% 78%, rgba(255, 123, 0, 0.08), transparent 42%),
+    linear-gradient(135deg, #faf6ff 0%, #fbfafd 46%, #fffaf2 100%);
   background-attachment: fixed;
   color: var(--text-main);
   line-height: 1.5;
@@ -2229,6 +2229,45 @@ main {
   background-color: var(--whatsapp-hover);
   transform: scale(1.1) rotate(5deg);
   box-shadow: 0 6px 24px rgba(37, 211, 102, 0.45);
+}
+
+.whatsapp-floating-btn.active {
+  transform: scale(0.95);
+  background-color: var(--whatsapp-hover);
+}
+
+.whatsapp-dropdown-menu {
+  pointer-events: auto;
+  position: absolute;
+  bottom: 75px;
+  right: 0;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  padding: 8px;
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  z-index: 1000;
+}
+
+.whatsapp-dropdown-item {
+  display: flex;
+  flex-direction: column;
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  transition: var(--transition-fast);
+  text-decoration: none;
+  text-align: left;
+  border: 1px solid transparent;
+}
+
+.whatsapp-dropdown-item:hover, .whatsapp-dropdown-item:focus {
+  background-color: var(--primary-light);
+  border-color: rgba(94, 30, 170, 0.15);
+  outline: none;
 }
 
 .whatsapp-svg-icon {

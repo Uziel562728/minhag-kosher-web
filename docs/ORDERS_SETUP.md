@@ -1,6 +1,6 @@
 # Configuración del Sistema de Pedidos y Base de Datos
 
-Este documento detalla los pasos necesarios para configurar el nuevo flujo de pedidos de **Super Market Kosher**, migrando del envío por WhatsApp a un sistema transaccional robusto en el backend con Supabase y notificaciones push vía Firebase Cloud Messaging.
+Este documento detalla los pasos necesarios para configurar el nuevo flujo de pedidos de **Minhag Kosher**, migrando del envío por WhatsApp a un sistema transaccional robusto en el backend con Supabase y notificaciones push vía Firebase Cloud Messaging.
 
 ---
 

@@ -1,11 +1,11 @@
 {
-  "name": "Super Market Kosher Admin",
-  "short_name": "SM Kosher Admin",
-  "start_url": "/super-market-web-/admin",
-  "scope": "/super-market-web-/",
+  "name": "Minhag Kosher Admin",
+  "short_name": "Minhag Admin",
+  "start_url": "/admin",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#e53e3e",
+  "theme_color": "#5E1EAA",
   "icons": [
     {
       "src": "favicon.webp",

@@ -28,3 +28,4 @@ desktop.ini
 *.sw?
 
 supabase/functions/.env.production
+supabase/.temp/

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import logoImg from '../images/logo supermarket.webp';
+import logoImg from '../images/minhag-logo-transparent.png';
 
 export default function Header() {
   const navigate = useNavigate();
@@ -38,7 +38,7 @@ export default function Header() {
     <header className={`header ${scrolled ? 'header-scrolled' : ''}`}>
       <div className="header-container">
         <a href="#" className="logo-container" onClick={(e) => { e.preventDefault(); scrollToSection('home'); }}>
-          <img src={logoImg} alt="Super Market Kosher" className="logo-img-nav" />
+          <img src={logoImg} alt="Minhag Kosher" className="logo-img-nav" />
         </a>
 
         {/* Desktop Nav */}

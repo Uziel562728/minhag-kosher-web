@@ -1,4 +1,4 @@
-name: Deploy Super Market Kosher to GitHub Pages
+name: Deploy Minhag Kosher to GitHub Pages
 
 on:
   push:

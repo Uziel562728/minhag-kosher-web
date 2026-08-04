@@ -55,7 +55,7 @@ export default function AdminLogin() {
     <div className="admin-login-page">
       <div className="admin-login-card">
         <div className="login-logo-container">
-          <h2>SUPER MARKET KOSHER</h2>
+          <h2>MINHAG KOSHER</h2>
           <span>Panel de Control Privado</span>
         </div>
 
@@ -67,7 +67,7 @@ export default function AdminLogin() {
             <input
               type="email"
               id="email"
-              placeholder="admin@supermarketkosher.com"
+              placeholder="admin@minhagkosher.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required

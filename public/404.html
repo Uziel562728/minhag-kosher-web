@@ -2,14 +2,15 @@
 <html>
   <head>
     <meta charset="utf-8">
-    <title>Super Market Kosher</title>
+    <title>Minhag Kosher</title>
     <script type="text/javascript">
       // Single Page Apps for GitHub Pages
       // MIT License
       // https://github.com/rafgraph/spa-github-pages
       // This script checks if there is a redirect in the lookup table
       // and redirects the user back to the correct path.
-      var pathSegmentsToKeep = 1; // 1 segment for '/super-market-web-'
+      var firstSegment = window.location.pathname.split('/').filter(Boolean)[0];
+      var pathSegmentsToKeep = (firstSegment && !['admin', 'catalog', 'products', 'login', 'cart'].includes(firstSegment)) ? 1 : 0;
 
       var l = window.location;
       var redirectUrl = l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
