@@ -6,6 +6,7 @@ import ProductSearch from './ProductSearch';
 import ProductFilters from './ProductFilters';
 import { getCachedCatalog, setCachedCatalog } from '../lib/catalogCache';
 import { clearCatalogState, getCatalogState } from '../utils/catalogNavigationState';
+import { categoryHasProductSections, getProductSectionOptions, normalizeProductSection } from '../config/productSections';
 
 export default function ProductGrid({ 
   selectedCategory, 
@@ -90,32 +91,10 @@ export default function ProductGrid({
     return categoriesList.find(c => c.id === selectedCategory);
   }, [categoriesList, selectedCategory]);
 
-  const showSectionFilter = activeCategory && ['unidades', 'tortas', 'dulces'].includes(activeCategory.slug);
-
-  const getSectionOptions = (slug) => {
-    if (slug === 'unidades') {
-      return [
-        { value: 'all', label: 'Todos' },
-        { value: 'carne', label: 'Carne' },
-        { value: 'lactea', label: 'Láctea' }
-      ];
-    }
-    if (slug === 'tortas') {
-      return [
-        { value: 'all', label: 'Todos' },
-        { value: 'parve', label: 'Parve' },
-        { value: 'lactea', label: 'Láctea' }
-      ];
-    }
-    if (slug === 'dulces') {
-      return [
-        { value: 'all', label: 'Todos' },
-        { value: 'neutro', label: 'Neutro' },
-        { value: 'lactea', label: 'Lácteo' }
-      ];
-    }
-    return [];
-  };
+  const showSectionFilter = activeCategory && categoryHasProductSections(activeCategory.slug);
+  const sectionOptions = activeCategory
+    ? [{ value: 'all', label: 'Todos' }, ...getProductSectionOptions(activeCategory.slug)]
+    : [];
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
@@ -128,7 +107,7 @@ export default function ProductGrid({
 
     // Filter by Section
     if (selectedSection !== 'all') {
-      result = result.filter(p => p.seccion === selectedSection);
+      result = result.filter(p => normalizeProductSection(p.seccion) === selectedSection);
     }
 
     // Filter by Search Query
@@ -289,7 +268,7 @@ export default function ProductGrid({
         {/* Section Filter Pills */}
         {showSectionFilter && (
           <div className="section-filters-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px', justifyContent: 'center', width: '100%' }}>
-            {getSectionOptions(activeCategory.slug).map((opt) => (
+            {sectionOptions.map((opt) => (
               <button
                 key={opt.value}
                 type="button"

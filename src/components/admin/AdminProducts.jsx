@@ -4,6 +4,7 @@ import { supabase } from '../../supabaseClient';
 import { clearCachedCatalog } from '../../lib/catalogCache';
 import { Pencil, Trash2 } from 'lucide-react';
 import { getProductImage } from '../../utils/getProductImage';
+import { getProductSectionLabel } from '../../config/productSections';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -93,14 +94,6 @@ export default function AdminProducts() {
     });
     return { categoryMap: nameMap, categorySlugMap: slugMap };
   }, [categories]);
-
-  const getSectionLabel = (sec, categorySlug) => {
-    if (!sec) return '';
-    if (sec === 'lactea') {
-      return categorySlug === 'dulces' ? 'Lácteo' : 'Láctea';
-    }
-    return sec.charAt(0).toUpperCase() + sec.slice(1);
-  };
 
   // Client-side search and category filtering for dashboard administration
   const filteredProducts = useMemo(() => {
@@ -199,7 +192,7 @@ export default function AdminProducts() {
                       <strong>{prod.nombre}</strong>
                       {prod.seccion && (
                         <span className="product-brand-tag admin-desktop-only">
-                          {getSectionLabel(prod.seccion, categorySlugMap[prod.categoria_id])}
+                      {getProductSectionLabel(prod.seccion, categorySlugMap[prod.categoria_id])}
                         </span>
                       )}
                     </div>
@@ -207,7 +200,7 @@ export default function AdminProducts() {
                   {prod.seccion && (
                     <td data-label="Sección" className="admin-mobile-only">
                       <span className="product-brand-tag">
-                        {getSectionLabel(prod.seccion, categorySlugMap[prod.categoria_id])}
+                      {getProductSectionLabel(prod.seccion, categorySlugMap[prod.categoria_id])}
                       </span>
                     </td>
                   )}

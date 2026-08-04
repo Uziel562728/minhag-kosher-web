@@ -1,10 +1,22 @@
+import {
+  categoryHasProductSections,
+  isValidProductSection,
+  normalizeCategorySlug,
+  normalizeProductSection,
+} from '../config/productSections';
+
 export const CATALOG_STATE_KEY = 'minhag_catalog_state_v1';
 
 const sanitize = (state) => {
   if (!state || typeof state !== 'object') return null;
+  const categorySlug = normalizeCategorySlug(state.categorySlug || 'all') || 'all';
+  const requestedSection = state.section === 'all' ? 'all' : normalizeProductSection(state.section);
+  const section = categoryHasProductSections(categorySlug) && isValidProductSection(categorySlug, requestedSection)
+    ? requestedSection
+    : 'all';
   return {
-    categorySlug: typeof state.categorySlug === 'string' ? state.categorySlug : 'all',
-    section: typeof state.section === 'string' ? state.section : 'all',
+    categorySlug,
+    section,
     search: typeof state.search === 'string' ? state.search : '',
     productSlug: typeof state.productSlug === 'string' ? state.productSlug : '',
     productId: state.productId ?? null,

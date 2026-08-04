@@ -4,6 +4,13 @@ import { supabase } from '../../supabaseClient';
 import { categories as staticCategories } from '../../data/categories';
 import { clearCachedCatalog } from '../../lib/catalogCache';
 import { getLowestPresentationPrice, validatePresentations } from '../../utils/productPresentations';
+import {
+  categoryHasProductSections,
+  getProductSectionOptions,
+  isValidProductSection,
+  normalizeCategorySlug,
+  normalizeProductSection,
+} from '../../config/productSections';
 
 export default function AdminProductForm() {
   const { id } = useParams(); // If present, we are in Edit mode
@@ -153,31 +160,16 @@ export default function AdminProductForm() {
     return categories.find(c => c.id === categoriaId);
   }, [categories, categoriaId]);
 
-  const categorySlug = selectedCategoryObj ? selectedCategoryObj.slug : '';
+  const categorySlug = normalizeCategorySlug(selectedCategoryObj?.slug);
+  const sectionOptions = useMemo(() => getProductSectionOptions(categorySlug), [categorySlug]);
 
-  // Reset and sanitize section when category changes
+  // Preserve a valid existing section and clear it only when it is incompatible.
   useEffect(() => {
-    if (!categorySlug) {
-      setSeccion('');
-      return;
-    }
-
-    if (categorySlug === 'unidades') {
-      if (seccion !== 'carne' && seccion !== 'lactea') {
-        setSeccion('');
-      }
-    } else if (categorySlug === 'tortas') {
-      if (seccion !== 'parve' && seccion !== 'lactea') {
-        setSeccion('');
-      }
-    } else if (categorySlug === 'dulces') {
-      if (seccion !== 'neutro' && seccion !== 'lactea') {
-        setSeccion('');
-      }
-    } else {
-      setSeccion('');
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setSeccion((currentSection) => {
+      if (!categoryHasProductSections(categorySlug)) return '';
+      const normalizedSection = normalizeProductSection(currentSection);
+      return isValidProductSection(categorySlug, normalizedSection) ? normalizedSection : '';
+    });
   }, [categorySlug]);
 
   // Upload main image to Supabase Storage
@@ -328,9 +320,10 @@ export default function AdminProductForm() {
     }
     
     // Section validation: required only for units, tortas, and sweets
-    const isSectionRequired = ['unidades', 'tortas', 'dulces'].includes(categorySlug);
-    if (isSectionRequired && !seccion) {
-      setErrorMsg('La sección es obligatoria para esta categoría.');
+    const isSectionRequired = categoryHasProductSections(categorySlug);
+    const normalizedSection = normalizeProductSection(seccion);
+    if (isSectionRequired && !isValidProductSection(categorySlug, normalizedSection)) {
+      setErrorMsg('Seleccioná una sección válida para esta categoría.');
       setLoading(false);
       return;
     }
@@ -378,7 +371,7 @@ export default function AdminProductForm() {
       precio: presentationMode === 'traditional' ? parseFloat(precio) : getLowestPresentationPrice({ presentaciones: normalizedPresentations, precio }),
       precio_anterior: precioAnterior ? parseFloat(precioAnterior) : null,
       categoria_id: cleanCategoriaId,
-      seccion: seccion || null,
+      seccion: isSectionRequired ? normalizedSection : null,
       destacado,
       oferta,
       disponible,
@@ -548,7 +541,7 @@ export default function AdminProductForm() {
                 ))}
               </select>
             </div>
-            {['unidades', 'tortas', 'dulces'].includes(categorySlug) ? (
+            {categoryHasProductSections(categorySlug) ? (
               <div className="form-group">
                 <label htmlFor="seccion">Sección *</label>
                 <select
@@ -558,24 +551,9 @@ export default function AdminProductForm() {
                   required
                 >
                   <option value="">Selecciona sección...</option>
-                  {categorySlug === 'unidades' && (
-                    <>
-                      <option value="carne">Carne</option>
-                      <option value="lactea">Láctea</option>
-                    </>
-                  )}
-                  {categorySlug === 'tortas' && (
-                    <>
-                      <option value="parve">Parve</option>
-                      <option value="lactea">Láctea</option>
-                    </>
-                  )}
-                  {categorySlug === 'dulces' && (
-                    <>
-                      <option value="neutro">Neutro</option>
-                      <option value="lactea">Lácteo</option>
-                    </>
-                  )}
+                  {sectionOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
                 </select>
               </div>
             ) : (

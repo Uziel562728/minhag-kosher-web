@@ -19,14 +19,7 @@ import {
   onlyAllowsClosedPacks,
   resolveProductSlug,
 } from '../utils/productPresentations';
-
-const getSectionLabel = (sec, categorySlug) => {
-  if (!sec) return '';
-  if (sec === 'lactea') {
-    return categorySlug === 'dulces' ? 'Lácteo' : 'Láctea';
-  }
-  return sec.charAt(0).toUpperCase() + sec.slice(1);
-};
+import { getProductSectionLabel } from '../config/productSections';
 
 export default function ProductDetail() {
   const { slug } = useParams();
@@ -266,7 +259,7 @@ export default function ProductDetail() {
           </div>
           {product.seccion && (
             <span className="product-detail-brand">
-              {getSectionLabel(product.seccion, product.categories?.slug)}
+                {getProductSectionLabel(product.seccion, product.categories?.slug)}
             </span>
           )}
           <h1>{product.nombre}</h1>

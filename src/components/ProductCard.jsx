@@ -6,6 +6,7 @@ import { getProductImage, hasRealProductImage } from '../utils/getProductImage';
 import { motion, useReducedMotion } from 'motion/react';
 import { saveCatalogState } from '../utils/catalogNavigationState';
 import { getLowestPresentationPrice, hasValidPresentations, onlyAllowsClosedPacks } from '../utils/productPresentations';
+import { getProductSectionLabel } from '../config/productSections';
 
 export default function ProductCard({ product, categories = [], catalogState, isRestoreTarget = false }) {
   const navigate = useNavigate();
@@ -47,15 +48,6 @@ export default function ProductCard({ product, categories = [], catalogState, is
   const hasRealImg = hasRealProductImage(product);
   const hasPresentations = hasValidPresentations(product);
   const lowestPrice = getLowestPresentationPrice(product);
-
-  // Section pretty labels helper
-  const getSectionLabel = (sec, categorySlug) => {
-    if (!sec) return '';
-    if (sec === 'lactea') {
-      return categorySlug === 'dulces' ? 'Lácteo' : 'Láctea';
-    }
-    return sec.charAt(0).toUpperCase() + sec.slice(1);
-  };
 
   // Calculate discount percentage if previous price exists
   const discount = precio_anterior && precio_anterior > precio
@@ -108,7 +100,7 @@ export default function ProductCard({ product, categories = [], catalogState, is
         <div className="product-meta">
           {seccion && (
             <span className="product-brand">
-              {getSectionLabel(seccion, categoryInfo?.slug)}
+              {getProductSectionLabel(seccion, categoryInfo?.slug)}
             </span>
           )}
           <span className="product-category-tag">{categoryLabel}</span>
