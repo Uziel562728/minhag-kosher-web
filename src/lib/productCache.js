@@ -133,7 +133,7 @@ if (typeof window !== 'undefined') {
               const cat = cachedCat.categories.find(c => c.id === prod.categoria_id);
               const formatted = {
                 ...prod,
-                categories: cat ? { nombre: cat.nombre } : (prod.categories || null)
+                categories: cat ? { nombre: cat.nombre, slug: cat.slug } : (prod.categories || null)
               };
               memoryProductById.set(prod.id, { data: formatted, timestamp: cachedCat.timestamp || Date.now() });
               if (prod.slug) {
@@ -209,7 +209,7 @@ export const storeProductInCache = (product, categories = null) => {
   if (!categoryData && categories && Array.isArray(categories)) {
     const matched = categories.find(c => c.id === product.categoria_id);
     if (matched) {
-      categoryData = { nombre: matched.nombre };
+      categoryData = { nombre: matched.nombre, slug: matched.slug };
     }
   }
 

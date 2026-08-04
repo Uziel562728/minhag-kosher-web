@@ -1,20 +1,47 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { buildCartLineKey } from '../utils/productPresentations';
 
 const CartContext = createContext();
+const CART_STORAGE_KEY = 'minhag_cart_v2';
+const LEGACY_CART_STORAGE_KEY = 'sm_cart';
+
+const normalizeTraditionalLine = (item) => {
+  if (!item?.product?.id || !Number.isInteger(Number(item.quantity)) || Number(item.quantity) <= 0) return null;
+  return {
+    ...item,
+    productId: item.product.id,
+    nombre: item.product.nombre,
+    lineKey: buildCartLineKey(item.product.id),
+    mode: 'traditional',
+    quantity: Number(item.quantity),
+  };
+};
+
+const loadStoredCart = () => {
+  try {
+    const current = JSON.parse(localStorage.getItem(CART_STORAGE_KEY) || 'null');
+    if (Array.isArray(current)) return { cart: current, removed: 0, notice: '' };
+    const legacy = JSON.parse(localStorage.getItem(LEGACY_CART_STORAGE_KEY) || '[]');
+    if (!Array.isArray(legacy)) return { cart: [], removed: 0, notice: '' };
+    const migrated = legacy.map(normalizeTraditionalLine).filter(Boolean);
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(migrated));
+    localStorage.removeItem(LEGACY_CART_STORAGE_KEY);
+    return { cart: migrated, removed: legacy.length - migrated.length, notice: '' };
+  } catch {
+    return { cart: [], removed: 0, notice: 'No se pudo recuperar el carrito anterior porque sus datos eran incompatibles.' };
+  }
+};
 
 export function CartProvider({ children }) {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const [cart, setCart] = useState(() => {
-    try {
-      const saved = localStorage.getItem('sm_cart');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [initialCart] = useState(loadStoredCart);
+  const [cart, setCart] = useState(initialCart.cart);
+  const [migrationNotice, setMigrationNotice] = useState(() => initialCart.notice || (initialCart.removed > 0
+    ? `Se quitaron ${initialCart.removed} artículo(s) antiguos incompatibles del carrito.`
+    : ''));
 
   const isCartOpen = location.hash === '#cart';
 
@@ -31,58 +58,104 @@ export function CartProvider({ children }) {
   };
 
   useEffect(() => {
-    localStorage.setItem('sm_cart', JSON.stringify(cart));
+    try {
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    } catch {
+      // The in-memory cart remains usable when storage is restricted.
+    }
   }, [cart]);
 
   const addToCart = (product, quantity = 1) => {
+    const lineKey = buildCartLineKey(product.id);
     setCart((prev) => {
-      const existing = prev.find((item) => item.product.id === product.id);
+      const existing = prev.find((item) => item.lineKey === lineKey || (!item.lineKey && item.product.id === product.id));
       if (existing) {
         return prev.map((item) =>
-          item.product.id === product.id
-            ? { ...item, quantity: item.quantity + quantity }
+          (item.lineKey === lineKey || (!item.lineKey && item.product.id === product.id))
+            ? { ...item, lineKey, mode: 'traditional', quantity: item.quantity + quantity }
             : item
         );
       }
-      return [...prev, { product, quantity }];
+      return [...prev, { productId: product.id, nombre: product.nombre, product, quantity, lineKey, mode: 'traditional' }];
     });
   };
 
-  const removeFromCart = (productId) => {
-    setCart((prev) => prev.filter((item) => item.product.id !== productId));
+  const addConfiguredLine = (line) => {
+    if (!line?.lineKey || !line.product) return;
+    setCart((prev) => {
+      const existing = prev.find((item) => item.lineKey === line.lineKey);
+      if (!existing) return [...prev, line];
+      return prev.map((item) => item.lineKey === line.lineKey ? line : item);
+    });
   };
 
-  const updateQuantity = (productId, quantity) => {
+  const removeFromCart = (identifier) => {
+    setCart((prev) => prev.filter((item) => item.lineKey !== identifier && item.product.id !== identifier));
+  };
+
+  const updateQuantity = (identifier, quantity) => {
     if (quantity <= 0) {
-      removeFromCart(productId);
+      removeFromCart(identifier);
       return;
     }
     setCart((prev) =>
       prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
+        (item.lineKey === identifier || (item.mode === 'traditional' && item.product.id === identifier))
+          ? { ...item, quantity }
+          : item
       )
     );
+  };
+
+  const updateConfiguredLine = (lineKey, updater) => {
+    setCart((prev) => prev.map((item) => item.lineKey === lineKey ? updater(item) : item));
   };
 
   const clearCart = () => {
     setCart([]);
   };
 
-  const cartCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const cartTotal = cart.reduce((total, item) => total + item.product.precio * item.quantity, 0);
+  const addItemsToCart = (items, mode = 'add') => {
+    setCart((currentCart) => {
+      const nextCart = mode === 'replace' ? [] : [...currentCart];
+      items.forEach(({ product, quantity, cartLine }) => {
+        if (cartLine) {
+          const configuredIndex = nextCart.findIndex((item) => item.lineKey === cartLine.lineKey);
+          if (configuredIndex >= 0) nextCart[configuredIndex] = cartLine;
+          else nextCart.push(cartLine);
+          return;
+        }
+        const lineKey = buildCartLineKey(product.id);
+        const index = nextCart.findIndex((item) => item.lineKey === lineKey || (item.mode === 'traditional' && item.product.id === product.id));
+        if (index >= 0) nextCart[index] = { ...nextCart[index], quantity: nextCart[index].quantity + quantity };
+        else nextCart.push({ productId: product.id, nombre: product.nombre, product, quantity, lineKey, mode: 'traditional' });
+      });
+      return nextCart;
+    });
+  };
+
+  const cartCount = cart.reduce((total, item) => total + (item.cantidadUnidadesTotales || item.quantity || 0), 0);
+  const cartTotal = cart.reduce((total, item) => total + (item.mode === 'traditional'
+    ? item.product.precio * item.quantity
+    : item.subtotal || 0), 0);
 
   return (
     <CartContext.Provider
       value={{
         cart,
         addToCart,
+        addConfiguredLine,
         removeFromCart,
         updateQuantity,
+        updateConfiguredLine,
         clearCart,
+        addItemsToCart,
         cartCount,
         cartTotal,
         isCartOpen,
         setIsCartOpen,
+        migrationNotice,
+        clearMigrationNotice: () => setMigrationNotice(''),
       }}
     >
       {children}

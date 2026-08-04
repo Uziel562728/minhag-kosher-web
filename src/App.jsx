@@ -1,32 +1,36 @@
-import React, { useEffect, useLayoutEffect, useState } from 'react';
+import React, { lazy, Suspense, useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import ProductGrid from './components/ProductGrid';
-import Contact from './components/Contact';
 import WhatsAppButton from './components/WhatsAppButton';
 import Footer from './components/Footer';
-import ProductDetail from './components/ProductDetail';
 import './App.css';
 
 // Admin imports
-import AdminLogin from './components/admin/AdminLogin';
-import AdminDashboard from './components/admin/AdminDashboard';
-import AdminProducts from './components/admin/AdminProducts';
-import AdminProductForm from './components/admin/AdminProductForm';
-import AdminCategories from './components/admin/AdminCategories';
-import AdminCategoryForm from './components/admin/AdminCategoryForm';
 import ProtectedRoute from './components/admin/ProtectedRoute';
 import { CartProvider } from './context/CartContext';
 import CartDrawer from './components/CartDrawer';
 import FloatingCartButton from './components/FloatingCartButton';
+
+const Contact = lazy(() => import('./components/Contact'));
+const ProductDetail = lazy(() => import('./components/ProductDetail'));
+const AdminLogin = lazy(() => import('./components/admin/AdminLogin'));
+const AdminDashboard = lazy(() => import('./components/admin/AdminDashboard'));
+const AdminProducts = lazy(() => import('./components/admin/AdminProducts'));
+const AdminProductForm = lazy(() => import('./components/admin/AdminProductForm'));
+const AdminCategories = lazy(() => import('./components/admin/AdminCategories'));
+const AdminCategoryForm = lazy(() => import('./components/admin/AdminCategoryForm'));
+
+const RouteFallback = () => <div className="catalog-loading-inner"><div className="admin-spinner" /><p>Cargando...</p></div>;
 
 function ScrollManager() {
   const location = useLocation();
 
   useLayoutEffect(() => {
     const sectionId = new URLSearchParams(location.search).get('section');
-    if (!sectionId) {
+    const hasCatalogRestore = location.pathname === '/' && Boolean(sessionStorage.getItem('minhag_catalog_state_v1'));
+    if (!sectionId && !hasCatalogRestore) {
       const docEl = document.documentElement;
       const prevBehavior = docEl.style.scrollBehavior;
       docEl.style.scrollBehavior = 'auto';
@@ -48,13 +52,13 @@ function PublicLayout() {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const handleSelectCategory = (category) => {
+  const handleSelectCategory = useCallback((category) => {
     setSelectedCategory(category);
-  };
+  }, []);
 
-  const handleSearchChange = (query) => {
+  const handleSearchChange = useCallback((query) => {
     setSearchQuery(query);
-  };
+  }, []);
 
   useEffect(() => {
     const sectionId = new URLSearchParams(location.search).get('section');
@@ -90,10 +94,11 @@ function PublicLayout() {
             onSelectCategory={handleSelectCategory}
             searchQuery={searchQuery}
             onSearchChange={handleSearchChange}
+            navigationState={location.state}
           />
 
           {/* Contact Info, Map, Hours & direct WhatsApp triggers */}
-          <Contact />
+          <Suspense fallback={<RouteFallback />}><Contact /></Suspense>
         </div>
       </main>
 
@@ -111,7 +116,7 @@ export default function App() {
     <Router basename={import.meta.env.BASE_URL}>
       <ScrollManager />
       <CartProvider>
-        <Routes>
+        <Suspense fallback={<RouteFallback />}><Routes>
           {/* Public Website */}
           <Route path="/" element={<PublicLayout />} />
           <Route path="/:slug" element={<ProductDetail />} />
@@ -133,7 +138,7 @@ export default function App() {
 
           {/* Catch-all Redirect */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+        </Routes></Suspense>
         <CartDrawer />
         <FloatingCartButton />
       </CartProvider>

@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { categories as staticCategories } from '../../data/categories';
 import { clearCachedCatalog } from '../../lib/catalogCache';
+import { getLowestPresentationPrice, validatePresentations } from '../../utils/productPresentations';
 
 export default function AdminProductForm() {
   const { id } = useParams(); // If present, we are in Edit mode
@@ -15,11 +16,14 @@ export default function AdminProductForm() {
   const [precio, setPrecio] = useState('');
   const [precioAnterior, setPrecioAnterior] = useState('');
   const [categoriaId, setCategoriaId] = useState('');
-  const [marca, setMarca] = useState('');
+  const [seccion, setSeccion] = useState('');
   const [destacado, setDestacado] = useState(false);
   const [oferta, setOferta] = useState(false);
   const [disponible, setDisponible] = useState(true);
   const [orden, setOrden] = useState('0');
+  const [presentationMode, setPresentationMode] = useState('traditional');
+  const [presentaciones, setPresentaciones] = useState([]);
+  const [supportsPresentationsColumn, setSupportsPresentationsColumn] = useState(false);
 
   // Images state
   const [imagenPrincipal, setImagenPrincipal] = useState('');
@@ -102,18 +106,27 @@ export default function AdminProductForm() {
         if (error) throw error;
 
         if (data) {
+          setSupportsPresentationsColumn(Object.prototype.hasOwnProperty.call(data, 'presentaciones'));
           setNombre(data.nombre || '');
           setDescripcion(data.descripcion || '');
           setPrecio(data.precio ? data.precio.toString() : '');
           setPrecioAnterior(data.precio_anterior ? data.precio_anterior.toString() : '');
           setCategoriaId(data.categoria_id || '');
-          setMarca(data.marca || '');
+          setSeccion(data.seccion || '');
           setDestacado(data.destacado || false);
           setOferta(data.oferta || false);
           setDisponible(data.disponible ?? true);
           setOrden(data.orden !== undefined ? data.orden.toString() : '0');
           setImagenPrincipal(data.imagen_principal || '');
           setImagenesAdicionales(data.imagenes_adicionales || []);
+          if (Array.isArray(data.presentaciones) && data.presentaciones.length > 0) {
+            const hasUnit = data.presentaciones.some((presentation) => presentation.tipo === 'unidad');
+            setPresentationMode(hasUnit ? 'free' : 'packs');
+            setPresentaciones(data.presentaciones);
+          } else {
+            setPresentationMode('traditional');
+            setPresentaciones([]);
+          }
         }
       } catch (err) {
         console.error('Error al cargar detalles de producto de Supabase:', {
@@ -135,6 +148,37 @@ export default function AdminProductForm() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isEdit]);
+
+  const selectedCategoryObj = useMemo(() => {
+    return categories.find(c => c.id === categoriaId);
+  }, [categories, categoriaId]);
+
+  const categorySlug = selectedCategoryObj ? selectedCategoryObj.slug : '';
+
+  // Reset and sanitize section when category changes
+  useEffect(() => {
+    if (!categorySlug) {
+      setSeccion('');
+      return;
+    }
+
+    if (categorySlug === 'unidades') {
+      if (seccion !== 'carne' && seccion !== 'lactea') {
+        setSeccion('');
+      }
+    } else if (categorySlug === 'tortas') {
+      if (seccion !== 'parve' && seccion !== 'lactea') {
+        setSeccion('');
+      }
+    } else if (categorySlug === 'dulces') {
+      if (seccion !== 'neutro' && seccion !== 'lactea') {
+        setSeccion('');
+      }
+    } else {
+      setSeccion('');
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [categorySlug]);
 
   // Upload main image to Supabase Storage
   const handleMainImageUpload = async (e) => {
@@ -251,6 +295,26 @@ export default function AdminProductForm() {
     setImagenesAdicionales(imagenesAdicionales.filter((_, idx) => idx !== indexToRemove));
   };
 
+  const addPresentation = () => {
+    const defaultType = presentationMode === 'packs' ? 'pack' : (presentaciones.some((item) => item.tipo === 'unidad') ? 'pack' : 'unidad');
+    const defaultQuantity = defaultType === 'unidad' ? 1 : 12;
+    setPresentaciones((current) => [...current, { id: defaultType === 'unidad' ? 'unidad' : `pack-${defaultQuantity}-${current.length + 1}`, label: defaultType === 'unidad' ? 'Unidad' : `Pack x${defaultQuantity}`, tipo: defaultType, cantidad_unidades: defaultQuantity, precio: 0 }]);
+  };
+
+  const updatePresentation = (index, field, value) => {
+    setPresentaciones((current) => current.map((presentation, rowIndex) => {
+      if (rowIndex !== index) return presentation;
+      const updated = { ...presentation, [field]: value };
+      if (field === 'tipo' && value === 'unidad') {
+        updated.cantidad_unidades = 1;
+        updated.id = 'unidad';
+      } else if (field === 'cantidad_unidades' && updated.tipo === 'pack') {
+        updated.id = `pack-${value}`;
+      }
+      return updated;
+    }));
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
@@ -262,7 +326,16 @@ export default function AdminProductForm() {
       setLoading(false);
       return;
     }
-    if (!precio || isNaN(precio) || parseFloat(precio) < 0) {
+    
+    // Section validation: required only for units, tortas, and sweets
+    const isSectionRequired = ['unidades', 'tortas', 'dulces'].includes(categorySlug);
+    if (isSectionRequired && !seccion) {
+      setErrorMsg('La sección es obligatoria para esta categoría.');
+      setLoading(false);
+      return;
+    }
+
+    if (presentationMode === 'traditional' && (!precio || isNaN(precio) || parseFloat(precio) < 0)) {
       setErrorMsg('El precio debe ser un número positivo.');
       setLoading(false);
       return;
@@ -271,6 +344,17 @@ export default function AdminProductForm() {
       setErrorMsg('El precio anterior debe ser un número positivo.');
       setLoading(false);
       return;
+    }
+
+    let normalizedPresentations = [];
+    if (presentationMode !== 'traditional') {
+      const validation = validatePresentations(presentaciones, { mode: presentationMode });
+      if (!validation.valid) {
+        setErrorMsg(validation.errors.join(' '));
+        setLoading(false);
+        return;
+      }
+      normalizedPresentations = validation.presentations;
     }
 
     // Verify if categoriaId is a valid UUID to prevent database type exceptions if falling back to static category slugs
@@ -291,10 +375,10 @@ export default function AdminProductForm() {
       nombre: nombre.trim(),
       slug,
       descripcion: descripcion.trim() || null,
-      precio: parseFloat(precio),
+      precio: presentationMode === 'traditional' ? parseFloat(precio) : getLowestPresentationPrice({ presentaciones: normalizedPresentations, precio }),
       precio_anterior: precioAnterior ? parseFloat(precioAnterior) : null,
       categoria_id: cleanCategoriaId,
-      marca: marca.trim() || null,
+      seccion: seccion || null,
       destacado,
       oferta,
       disponible,
@@ -303,10 +387,12 @@ export default function AdminProductForm() {
       imagenes_adicionales: imagenesAdicionales,
       fecha_actualizacion: new Date().toISOString()
     };
+    if (presentationMode !== 'traditional' || supportsPresentationsColumn) {
+      productPayload.presentaciones = presentationMode === 'traditional' ? null : normalizedPresentations;
+    }
 
     try {
       if (isEdit) {
-        console.log('category_id a guardar:', productPayload.categoria_id);
         const { error } = await supabase
           .from('products')
           .update(productPayload)
@@ -401,7 +487,7 @@ export default function AdminProductForm() {
 
           <div className="form-row-two">
             <div className="form-group">
-              <label htmlFor="precio">Precio Actual ($) *</label>
+              <label htmlFor="precio">Precio Actual ($) {presentationMode === 'traditional' ? '*' : '(se calcula)'}</label>
               <input
                 type="number"
                 step="0.01"
@@ -409,7 +495,8 @@ export default function AdminProductForm() {
                 value={precio}
                 onChange={(e) => setPrecio(e.target.value)}
                 placeholder="Precio actual"
-                required
+                required={presentationMode === 'traditional'}
+                disabled={presentationMode !== 'traditional'}
               />
             </div>
             <div className="form-group">
@@ -425,6 +512,29 @@ export default function AdminProductForm() {
             </div>
           </div>
 
+          <div className="admin-presentations-editor">
+            <h4>Presentaciones</h4>
+            <div className="form-group">
+              <label htmlFor="presentation-mode">Comportamiento de venta</label>
+              <select id="presentation-mode" value={presentationMode} onChange={(event) => { const mode = event.target.value; setPresentationMode(mode); if (mode === 'traditional') setPresentaciones([]); }}>
+                <option value="traditional">Precio tradicional, sin presentaciones</option>
+                <option value="free">Permite cantidad libre con unidad y pack</option>
+                <option value="packs">Solo permite packs cerrados</option>
+              </select>
+            </div>
+            {presentationMode !== 'traditional' && <>
+              <p className="form-help-text">El precio base se actualizará al menor precio configurado. La columna debe existir en Supabase antes de guardar.</p>
+              <div className="admin-presentations-list">{presentaciones.map((presentation, index) => <div className="admin-presentation-row" key={`${presentation.id}-${index}`}>
+                <div className="form-group"><label>Nombre visible</label><input type="text" value={presentation.label} onChange={(event) => updatePresentation(index, 'label', event.target.value)} placeholder="Pack x12" /></div>
+                <div className="form-group"><label>Tipo</label><select value={presentation.tipo} onChange={(event) => updatePresentation(index, 'tipo', event.target.value)}><option value="unidad" disabled={presentationMode === 'packs'}>Unidad</option><option value="pack">Pack</option></select></div>
+                <div className="form-group"><label>Cantidad de unidades</label><input type="number" min="1" step="1" value={presentation.cantidad_unidades} disabled={presentation.tipo === 'unidad'} onChange={(event) => updatePresentation(index, 'cantidad_unidades', event.target.value)} /></div>
+                <div className="form-group"><label>Precio</label><input type="number" min="0" step="0.01" value={presentation.precio} onChange={(event) => updatePresentation(index, 'precio', event.target.value)} /></div>
+                <button type="button" className="btn btn-secondary admin-presentation-remove" onClick={() => setPresentaciones((current) => current.filter((_, rowIndex) => rowIndex !== index))}>Eliminar</button>
+              </div>)}</div>
+              <button type="button" className="btn btn-secondary" onClick={addPresentation}>Agregar presentación</button>
+            </>}
+          </div>
+
           <div className="form-row-two">
             <div className="form-group">
               <label htmlFor="categoria">Categoría</label>
@@ -438,16 +548,47 @@ export default function AdminProductForm() {
                 ))}
               </select>
             </div>
-            <div className="form-group">
-              <label htmlFor="marca">Marca</label>
-              <input
-                type="text"
-                id="marca"
-                value={marca}
-                onChange={(e) => setMarca(e.target.value)}
-                placeholder="Marca del producto"
-              />
-            </div>
+            {['unidades', 'tortas', 'dulces'].includes(categorySlug) ? (
+              <div className="form-group">
+                <label htmlFor="seccion">Sección *</label>
+                <select
+                  id="seccion"
+                  value={seccion}
+                  onChange={(e) => setSeccion(e.target.value)}
+                  required
+                >
+                  <option value="">Selecciona sección...</option>
+                  {categorySlug === 'unidades' && (
+                    <>
+                      <option value="carne">Carne</option>
+                      <option value="lactea">Láctea</option>
+                    </>
+                  )}
+                  {categorySlug === 'tortas' && (
+                    <>
+                      <option value="parve">Parve</option>
+                      <option value="lactea">Láctea</option>
+                    </>
+                  )}
+                  {categorySlug === 'dulces' && (
+                    <>
+                      <option value="neutro">Neutro</option>
+                      <option value="lactea">Lácteo</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            ) : (
+              <div className="form-group" style={{ opacity: 0.5 }}>
+                <label>Sección</label>
+                <input
+                  type="text"
+                  disabled
+                  value="No aplica para esta categoría"
+                  style={{ cursor: 'not-allowed' }}
+                />
+              </div>
+            )}
           </div>
 
           <div className="form-row-two">

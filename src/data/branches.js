@@ -17,7 +17,7 @@ export const branches = [
 
 /**
  * Checks if the Kosher branch is currently closed for Shabat.
- * Shabat closes on Fridays at 16:00 hs and remains closed all Saturday.
+ * Shabat closes on Fridays at 15:00 hs and remains closed all Saturday.
  * @returns {boolean} True if currently Shabat time
  */
 export function isKosherClosedForShabat() {
@@ -25,8 +25,8 @@ export function isKosherClosedForShabat() {
   const day = now.getDay(); // 0: Sunday, 1: Monday, 2: Tuesday, 3: Wednesday, 4: Thursday, 5: Friday, 6: Saturday
   const hour = now.getHours();
 
-  // Friday after 16:00 hs (4 PM)
-  if (day === 5 && hour >= 16) {
+  // Friday after 15:00 hs
+  if (day === 5 && hour >= 15) {
     return true;
   }
   // Saturday all day

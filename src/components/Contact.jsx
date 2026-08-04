@@ -119,14 +119,14 @@ export default function Contact() {
             <div className="hours-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                 <span>Lunes a Jueves:</span>
-                <strong>08:00 a 19:30 hs</strong>
+                <strong>08:00 a 17:00 hs</strong>
               </div>
               <div className={`hours-item ${isShabat ? 'active-shabat-hours' : ''}`} style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
                 <span>Viernes:</span>
                 {isShabat ? (
-                  <strong className="shabat-highlight" style={{ color: 'var(--primary)' }}>⚠️ 08:00 a 16:00 hs (Cerrado por Shabat)</strong>
+                  <strong className="shabat-highlight" style={{ color: 'var(--primary)' }}>⚠️ 08:00 a 15:00 hs (Cerrado por Shabat)</strong>
                 ) : (
-                  <strong>08:00 a 16:00 hs</strong>
+                  <strong>08:00 a 15:00 hs</strong>
                 )}
               </div>
               <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '1px solid var(--border)', paddingBottom: '8px' }}>
@@ -135,7 +135,7 @@ export default function Contact() {
               </div>
               <div className="hours-item" style={{ display: 'flex', justifyContent: 'space-between', paddingBottom: '4px' }}>
                 <span>Domingos:</span>
-                <strong>08:30 a 14:00 hs</strong>
+                <strong>08:00 a 14:00 hs</strong>
               </div>
             </div>
             <div className="contact-promo-footer" style={{ marginTop: '16px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>

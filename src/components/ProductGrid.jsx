@@ -5,12 +5,14 @@ import ProductCard from './ProductCard';
 import ProductSearch from './ProductSearch';
 import ProductFilters from './ProductFilters';
 import { getCachedCatalog, setCachedCatalog } from '../lib/catalogCache';
+import { clearCatalogState, getCatalogState } from '../utils/catalogNavigationState';
 
 export default function ProductGrid({ 
   selectedCategory, 
   onSelectCategory, 
   searchQuery, 
-  onSearchChange 
+  onSearchChange,
+  navigationState,
 }) {
   const initialCache = getCachedCatalog();
   const [productsList, setProductsList] = useState(() => initialCache ? initialCache.products : []);
@@ -18,6 +20,9 @@ export default function ProductGrid({
   const [loading, setLoading] = useState(() => !initialCache);
   const [onlyOffers, setOnlyOffers] = useState(false);
   const [sortBy, setSortBy] = useState('default');
+  const [pendingRestore, setPendingRestore] = useState(() => getCatalogState(navigationState));
+  const [restoreTargetId, setRestoreTargetId] = useState(null);
+  const [restoreNotice, setRestoreNotice] = useState('');
 
   useEffect(() => {
     async function loadCatalog() {
@@ -69,26 +74,48 @@ export default function ProductGrid({
     loadCatalog();
   }, []);
 
+  const [selectedSection, setSelectedSection] = useState('all');
+
   useEffect(() => {
-    if (loading || productsList.length === 0) return;
+    if (loading || !pendingRestore || categoriesList.length === 0) return;
+    const restoredCategory = pendingRestore.categorySlug === 'all'
+      ? 'all'
+      : categoriesList.find((category) => category.slug === pendingRestore.categorySlug)?.id;
+    onSelectCategory(restoredCategory || 'all');
+    setSelectedSection(pendingRestore.section || 'all');
+    onSearchChange(pendingRestore.search || '');
+  }, [loading, pendingRestore, categoriesList, onSelectCategory, onSearchChange]);
 
-    const lastViewedId = sessionStorage.getItem('last_viewed_product_id');
-    if (lastViewedId) {
-      const timer = setTimeout(() => {
-        const element = document.getElementById(`product-card-${lastViewedId}`);
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          element.classList.add('product-card-highlighted');
-          setTimeout(() => {
-            element.classList.remove('product-card-highlighted');
-          }, 2000);
-        }
-        sessionStorage.removeItem('last_viewed_product_id');
-      }, 150);
+  const activeCategory = useMemo(() => {
+    return categoriesList.find(c => c.id === selectedCategory);
+  }, [categoriesList, selectedCategory]);
 
-      return () => clearTimeout(timer);
+  const showSectionFilter = activeCategory && ['unidades', 'tortas', 'dulces'].includes(activeCategory.slug);
+
+  const getSectionOptions = (slug) => {
+    if (slug === 'unidades') {
+      return [
+        { value: 'all', label: 'Todos' },
+        { value: 'carne', label: 'Carne' },
+        { value: 'lactea', label: 'Láctea' }
+      ];
     }
-  }, [loading, productsList]);
+    if (slug === 'tortas') {
+      return [
+        { value: 'all', label: 'Todos' },
+        { value: 'parve', label: 'Parve' },
+        { value: 'lactea', label: 'Láctea' }
+      ];
+    }
+    if (slug === 'dulces') {
+      return [
+        { value: 'all', label: 'Todos' },
+        { value: 'neutro', label: 'Neutro' },
+        { value: 'lactea', label: 'Lácteo' }
+      ];
+    }
+    return [];
+  };
 
   // Filter and sort products
   const filteredProducts = useMemo(() => {
@@ -97,6 +124,11 @@ export default function ProductGrid({
     // Filter by Category
     if (selectedCategory !== 'all') {
       result = result.filter(p => p.categoria_id === selectedCategory);
+    }
+
+    // Filter by Section
+    if (selectedSection !== 'all') {
+      result = result.filter(p => p.seccion === selectedSection);
     }
 
     // Filter by Search Query
@@ -112,7 +144,6 @@ export default function ProductGrid({
       const query = normalize(searchQuery).trim();
       result = result.filter(p => 
         normalize(p.nombre).includes(query) || 
-        (p.marca && normalize(p.marca).includes(query)) ||
         (p.descripcion && normalize(p.descripcion).includes(query))
       );
     }
@@ -139,11 +170,75 @@ export default function ProductGrid({
     }
 
     return result;
-  }, [productsList, selectedCategory, searchQuery, onlyOffers, sortBy]);
+  }, [productsList, selectedCategory, selectedSection, searchQuery, onlyOffers, sortBy]);
+
+  useEffect(() => {
+    if (loading || !pendingRestore) return undefined;
+    const expectedCategoryId = pendingRestore.categorySlug === 'all'
+      ? 'all'
+      : categoriesList.find((category) => category.slug === pendingRestore.categorySlug)?.id || 'all';
+    if (selectedCategory !== expectedCategoryId || selectedSection !== (pendingRestore.section || 'all') || searchQuery !== (pendingRestore.search || '')) return undefined;
+
+    let firstFrame;
+    let secondFrame;
+    firstFrame = requestAnimationFrame(() => {
+      secondFrame = requestAnimationFrame(() => {
+        const targetProduct = filteredProducts.find((product) =>
+          (pendingRestore.productId != null && String(product.id) === String(pendingRestore.productId)) ||
+          product.slug === pendingRestore.productSlug
+        );
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        const headerHeight = document.querySelector('header')?.getBoundingClientRect().height || 80;
+
+        if (targetProduct) {
+          const element = document.getElementById(`product-card-${targetProduct.id}`);
+          if (element) {
+            setRestoreTargetId(targetProduct.id);
+            const targetTop = reduceMotion
+              ? pendingRestore.scrollY
+              : element.getBoundingClientRect().top + window.scrollY - headerHeight - 24;
+            window.scrollTo({ top: Math.max(0, targetTop), behavior: reduceMotion ? 'auto' : 'smooth' });
+          }
+        } else {
+          const grid = document.querySelector('.product-grid') || document.getElementById('catalog');
+          const top = grid ? grid.getBoundingClientRect().top + window.scrollY - headerHeight - 20 : pendingRestore.scrollY;
+          window.scrollTo({ top: Math.max(0, top), behavior: reduceMotion ? 'auto' : 'smooth' });
+          setRestoreNotice('El producto ya no está disponible en esta sección.');
+        }
+
+        clearCatalogState();
+        setPendingRestore(null);
+      });
+    });
+
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      cancelAnimationFrame(secondFrame);
+    };
+  }, [loading, pendingRestore, categoriesList, selectedCategory, selectedSection, searchQuery, filteredProducts]);
+
+  useEffect(() => {
+    if (restoreTargetId == null) return undefined;
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const timer = window.setTimeout(() => setRestoreTargetId(null), reduceMotion ? 0 : 1100);
+    return () => window.clearTimeout(timer);
+  }, [restoreTargetId]);
+
+  useEffect(() => {
+    if (!restoreNotice) return undefined;
+    const timer = window.setTimeout(() => setRestoreNotice(''), 4500);
+    return () => window.clearTimeout(timer);
+  }, [restoreNotice]);
+
+  const handleCategorySelect = (categoryId) => {
+    setSelectedSection('all');
+    onSelectCategory(categoryId);
+  };
 
   const handleResetFilters = () => {
-    onSelectCategory('all');
+    handleCategorySelect('all');
     onSearchChange('');
+    setSelectedSection('all');
     setOnlyOffers(false);
     setSortBy('default');
   };
@@ -166,6 +261,7 @@ export default function ProductGrid({
 
   return (
     <section id="catalog" className="catalog-section">
+      {restoreNotice && <div className="catalog-restore-notice" role="status">{restoreNotice}</div>}
       <div className="section-header">
         <span className="section-subtitle">Nuestra Tienda</span>
         <h2 className="section-title">Catálogo de Productos</h2>
@@ -183,12 +279,40 @@ export default function ProductGrid({
         <ProductFilters 
           categories={categoriesList}
           selectedCategory={selectedCategory}
-          onSelectCategory={onSelectCategory}
+          onSelectCategory={handleCategorySelect}
           onlyOffers={onlyOffers}
           onToggleOffers={setOnlyOffers}
           sortBy={sortBy}
           onSortChange={setSortBy}
         />
+
+        {/* Section Filter Pills */}
+        {showSectionFilter && (
+          <div className="section-filters-bar" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '16px', justifyContent: 'center', width: '100%' }}>
+            {getSectionOptions(activeCategory.slug).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`filter-pill ${selectedSection === opt.value ? 'active' : ''}`}
+                onClick={() => setSelectedSection(opt.value)}
+                style={{
+                  padding: '6px 16px',
+                  borderRadius: '999px',
+                  fontSize: '0.85rem',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  border: '1px solid',
+                  transition: 'var(--transition-fast)',
+                  backgroundColor: selectedSection === opt.value ? 'var(--primary)' : 'transparent',
+                  color: selectedSection === opt.value ? '#ffffff' : 'var(--text-main)',
+                  borderColor: selectedSection === opt.value ? 'var(--primary)' : 'var(--border)'
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Grid Results Counter */}
@@ -210,6 +334,12 @@ export default function ProductGrid({
               key={product.id} 
               product={product} 
               categories={categoriesList}
+              catalogState={{
+                categorySlug: activeCategory?.slug || 'all',
+                section: selectedSection,
+                search: searchQuery,
+              }}
+              isRestoreTarget={String(restoreTargetId) === String(product.id)}
             />
           ))}
         </div>

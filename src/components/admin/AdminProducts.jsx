@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../../supabaseClient';
 import { clearCachedCatalog } from '../../lib/catalogCache';
 import { Pencil, Trash2 } from 'lucide-react';
+import { getProductImage } from '../../utils/getProductImage';
 
 export default function AdminProducts() {
   const [products, setProducts] = useState([]);
@@ -82,21 +83,30 @@ export default function AdminProducts() {
     }
   };
 
-  // Map category ID to Category Name
-  const categoryMap = useMemo(() => {
-    return categories.reduce((map, cat) => {
-      map[cat.id] = cat.nombre;
-      return map;
-    }, {});
+  // Map category ID to Category Name and Slug
+  const { categoryMap, categorySlugMap } = useMemo(() => {
+    const nameMap = {};
+    const slugMap = {};
+    categories.forEach((cat) => {
+      nameMap[cat.id] = cat.nombre;
+      slugMap[cat.id] = cat.slug;
+    });
+    return { categoryMap: nameMap, categorySlugMap: slugMap };
   }, [categories]);
+
+  const getSectionLabel = (sec, categorySlug) => {
+    if (!sec) return '';
+    if (sec === 'lactea') {
+      return categorySlug === 'dulces' ? 'Lácteo' : 'Láctea';
+    }
+    return sec.charAt(0).toUpperCase() + sec.slice(1);
+  };
 
   // Client-side search and category filtering for dashboard administration
   const filteredProducts = useMemo(() => {
     return products.filter((p) => {
       const matchesCategory = selectedCategory === 'all' || p.categoria_id === selectedCategory;
-      const matchesSearch = 
-        p.nombre.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        (p.marca && p.marca.toLowerCase().includes(searchQuery.toLowerCase()));
+      const matchesSearch = p.nombre.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [products, selectedCategory, searchQuery]);
@@ -129,7 +139,7 @@ export default function AdminProducts() {
         <div className="filter-group search-filter">
           <input
             type="text"
-            placeholder="Buscar por nombre o marca..."
+            placeholder="Buscar por nombre..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -152,13 +162,13 @@ export default function AdminProducts() {
         <table className="admin-table">
           <thead>
             <tr>
-              <th>Imagen</th>
+              <th className="admin-desktop-only">Imagen</th>
               <th>Nombre</th>
               <th>Categoría</th>
               <th>Precio</th>
               <th>Estado</th>
-              <th>Destacado</th>
-              <th>Oferta</th>
+              <th className="admin-desktop-only">Destacado</th>
+              <th className="admin-desktop-only">Oferta</th>
               <th className="actions-column">Acciones</th>
             </tr>
           </thead>
@@ -172,21 +182,35 @@ export default function AdminProducts() {
             ) : (
               filteredProducts.map((prod) => (
                 <tr key={prod.id}>
-                  <td data-label="Imagen">
+                  <td data-label="Imagen" className="admin-desktop-only">
                     <div className="table-img-wrapper">
-                      {prod.imagen_principal ? (
-                        <img src={prod.imagen_principal} alt={prod.nombre} />
-                      ) : (
-                        <span className="no-img-badge">Sin Foto</span>
-                      )}
+                      <img 
+                        src={getProductImage({ ...prod, categories: { slug: categorySlugMap[prod.categoria_id] } })} 
+                        alt={prod.nombre} 
+                        onError={(e) => {
+                          e.target.onerror = null;
+                          e.target.src = getProductImage({});
+                        }}
+                      />
                     </div>
                   </td>
                   <td data-label="Nombre">
                     <div className="table-product-name">
                       <strong>{prod.nombre}</strong>
-                      {prod.marca && <span className="product-brand-tag">{prod.marca}</span>}
+                      {prod.seccion && (
+                        <span className="product-brand-tag admin-desktop-only">
+                          {getSectionLabel(prod.seccion, categorySlugMap[prod.categoria_id])}
+                        </span>
+                      )}
                     </div>
                   </td>
+                  {prod.seccion && (
+                    <td data-label="Sección" className="admin-mobile-only">
+                      <span className="product-brand-tag">
+                        {getSectionLabel(prod.seccion, categorySlugMap[prod.categoria_id])}
+                      </span>
+                    </td>
+                  )}
                   <td data-label="Categoría">{categoryMap[prod.categoria_id] || 'Sin categoría'}</td>
                   <td data-label="Precio">
                     <div className="table-prices">
@@ -201,8 +225,8 @@ export default function AdminProducts() {
                       {prod.disponible ? 'Disponible' : 'Sin Stock'}
                     </span>
                   </td>
-                  <td data-label="Destacado">{prod.destacado ? '⭐ Sí' : 'No'}</td>
-                  <td data-label="Oferta">{prod.oferta ? '🏷️ Sí' : 'No'}</td>
+                  <td data-label="Destacado" className="admin-desktop-only">{prod.destacado ? '⭐ Sí' : 'No'}</td>
+                  <td data-label="Oferta" className="admin-desktop-only">{prod.oferta ? '🏷️ Sí' : 'No'}</td>
                   <td data-label="Acciones">
                     <div className="table-actions">
                       <button

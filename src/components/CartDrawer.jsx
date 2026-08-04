@@ -1,19 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../context/CartContext';
 import { motion, AnimatePresence } from 'motion/react';
+import { Trash2 } from 'lucide-react';
 import { business } from '../config/business';
+import { getProductImage } from '../utils/getProductImage';
+import { saveOrderToHistory } from '../utils/orderHistory';
+import { buildWhatsAppOrderMessage } from '../utils/whatsappOrderMessage';
+import OrderHistory from './OrderHistory';
+import { calculateClosedPacks, calculateUnitAndPack, getReadableBreakdown, getValidPresentations } from '../utils/productPresentations';
 
 export default function CartDrawer() {
   const {
     cart,
     removeFromCart,
     updateQuantity,
+    updateConfiguredLine,
     cartTotal,
     cartCount,
     isCartOpen,
     setIsCartOpen,
-    clearCart
+    clearCart,
+    addItemsToCart,
+    migrationNotice,
+    clearMigrationNotice
   } = useCart();
 
   const navigate = useNavigate();
@@ -34,7 +44,8 @@ export default function CartDrawer() {
   const [website, setWebsite] = useState(''); // Honeypot
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const [orderResult, setOrderResult] = useState(null);
+  const [drawerView, setDrawerView] = useState('cart');
+  const [toast, setToast] = useState('');
 
   // Animation states
   const [removingItems, setRemovingItems] = useState([]);
@@ -44,40 +55,48 @@ export default function CartDrawer() {
   const selectedWa = business.whatsapp.find(w => w.id === selectedWhatsAppId);
   const isWhatsAppConfigured = !!selectedWa?.internationalNumber;
 
-  const handleUpdateQuantity = (productId, newQty) => {
+  const handleUpdateQuantity = (identifier, newQty) => {
     if (newQty <= 0) {
-      setRemovingItems((prev) => [...prev, productId]);
+      setRemovingItems((prev) => [...prev, identifier]);
       setTimeout(() => {
-        updateQuantity(productId, 0);
-        setRemovingItems((prev) => prev.filter((id) => id !== productId));
+        updateQuantity(identifier, 0);
+        setRemovingItems((prev) => prev.filter((id) => id !== identifier));
       }, 300);
     } else {
-      updateQuantity(productId, newQty);
+      updateQuantity(identifier, newQty);
     }
   };
 
-  const handleRemoveFromCart = (productId) => {
-    setRemovingItems((prev) => [...prev, productId]);
+  const handleRemoveFromCart = (identifier) => {
+    setRemovingItems((prev) => [...prev, identifier]);
     setTimeout(() => {
-      removeFromCart(productId);
-      setRemovingItems((prev) => prev.filter((id) => id !== productId));
+      removeFromCart(identifier);
+      setRemovingItems((prev) => prev.filter((id) => id !== identifier));
     }, 300);
   };
 
   const handleClearCart = () => {
-    if (window.confirm('¿Estás seguro de que deseas vaciar tu carrito?')) {
-      setIsClearingAll(true);
-      const duration = 300 + cart.length * 50;
-      setTimeout(() => {
-        clearCart();
-        setIsClearingAll(false);
-      }, duration);
-    }
+    setIsClearingAll(true);
+    const duration = 200 + cart.length * 30;
+    setTimeout(() => {
+      clearCart();
+      setIsClearingAll(false);
+    }, duration);
   };
 
   const handleClose = () => {
     setIsCartOpen(false);
   };
+
+  useEffect(() => {
+    if (!isCartOpen) setDrawerView('cart');
+  }, [isCartOpen]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = setTimeout(() => setToast(''), 4500);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const validateForm = () => {
     const tempErrors = {};
@@ -101,52 +120,6 @@ export default function CartDrawer() {
     
     setErrors(tempErrors);
     return Object.keys(tempErrors).length === 0;
-  };
-
-  // Reusable message builder functions as requested
-  const buildWhatsAppOrderMessage = (orderData) => {
-    const formatter = new Intl.NumberFormat("es-AR", {
-      style: "currency",
-      currency: "ARS",
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0
-    });
-
-    const deliveryText = orderData.shippingMethod === 'envio' ? 'Envío a domicilio' : 'Retiro por el local';
-    
-    let msg = `Hola, Minhag Kosher. Quiero realizar el siguiente pedido:\n\n`;
-    msg += `DATOS DEL CLIENTE\n`;
-    msg += `Nombre: ${orderData.name}\n`;
-    msg += `Teléfono: ${orderData.phone}\n`;
-    msg += `Entrega: ${deliveryText}\n`;
-    
-    if (orderData.shippingMethod === 'envio') {
-      msg += `\nDIRECCIÓN DE ENTREGA\n`;
-      msg += `Dirección: ${orderData.street}\n`;
-      msg += `Barrio/localidad: ${orderData.neighborhood}\n`;
-      msg += `Piso: ${orderData.floor || 'No indicado'}\n`;
-      msg += `Departamento: ${orderData.dept || 'No indicado'}\n`;
-      msg += `Indicaciones: ${orderData.notes || 'Sin indicaciones'}\n`;
-    }
-    
-    msg += `\nPEDIDO\n`;
-    orderData.cart.forEach((item, index) => {
-      const subtotal = item.product.precio * item.quantity;
-      msg += `${index + 1}. ${item.quantity} x ${item.product.nombre} — ${formatter.format(subtotal)}\n`;
-    });
-    
-    msg += `\nSubtotal: ${formatter.format(orderData.cartTotal)}\n`;
-    
-    if (orderData.shippingMethod === 'envio') {
-      msg += `Envío: A coordinar\n`;
-    } else {
-      msg += `Envío: No corresponde\n`;
-    }
-    
-    msg += `TOTAL: ${formatter.format(orderData.cartTotal)}\n\n`;
-    msg += `Quedo a la espera de la confirmación. Gracias.`;
-    
-    return msg;
   };
 
   const buildWhatsAppUrl = (phoneNumber, message) => {
@@ -192,38 +165,58 @@ export default function CartDrawer() {
       const messageText = buildWhatsAppOrderMessage(orderData);
       const whatsappUrl = buildWhatsAppUrl(selectedWa.internationalNumber, messageText);
 
-      // Open WhatsApp link in new tab
-      window.open(whatsappUrl, '_blank', 'noopener,noreferrer');
+      const whatsappWindow = window.open(whatsappUrl, '_blank');
+      if (!whatsappWindow) {
+        setSubmitError('El navegador bloqueó WhatsApp. Permití las ventanas emergentes e intentá nuevamente.');
+        return;
+      }
+      try {
+        whatsappWindow.opener = null;
+      } catch {
+        // Some browsers prevent changing opener after creating the tab.
+      }
 
-      // Set orderResult to show success view without clearing the cart automatically
-      setOrderResult({
-        name: orderData.name,
+      const savedOrder = saveOrderToHistory({
+        customerName: orderData.name,
+        phone: orderData.phone,
+        deliveryType: orderData.shippingMethod,
+        address: orderData.street,
+        neighborhood: orderData.neighborhood,
+        floor: orderData.floor,
+        department: orderData.dept,
+        notes: orderData.notes,
+        whatsapp: {
+          id: selectedWa.id,
+          label: selectedWa.label,
+          number: selectedWa.localNumber,
+        },
+        products: orderData.cart.map((item) => ({
+          productId: item.product.id,
+          productSlug: item.product.slug,
+          name: item.product.nombre,
+          quantity: item.quantity,
+          mode: item.mode || 'traditional',
+          presentationId: item.presentationId || null,
+          presentationLabel: item.presentationLabel || null,
+          cantidadPacks: item.cantidadPacks || 0,
+          cantidadUnidadesSueltas: item.cantidadUnidadesSueltas || 0,
+          cantidadUnidadesTotales: item.cantidadUnidadesTotales || item.quantity,
+          breakdown: item.breakdown || '',
+          precioUnitario: item.precioUnitario ?? Number(item.product.precio),
+          precioPresentacion: item.precioPresentacion ?? null,
+          subtotal: item.mode === 'traditional' ? Number(item.product.precio) * item.quantity : item.subtotal,
+        })),
+        subtotal: orderData.cartTotal,
+        shippingCost: orderData.shippingMethod === 'envio' ? null : 0,
         total: orderData.cartTotal,
-        whatsappUrl: whatsappUrl,
-        message: messageText,
-        whatsappLabel: selectedWa?.label || "WhatsApp"
       });
 
-      // SUPABASE DATABASE SAVE INTEGRATION IS CURRENTLY PENDING CONFIRMATION OF THE DATABASE.
-      // WE CONSERVE THE CODE IN CASE THE CLIENT WANTS TO ENABLE IT LATER:
-      /*
-      // Code template for saving order to Supabase:
-      const payload = {
-        customer: { name: name.trim(), phone: phone.trim() },
-        shipping: {
-          method: shippingMethod,
-          street: shippingMethod === 'envio' ? street.trim() : '',
-          neighborhood: shippingMethod === 'envio' ? neighborhood.trim() : '',
-          floor: shippingMethod === 'envio' ? floor.trim() : '',
-          department: shippingMethod === 'envio' ? dept.trim() : '',
-          notes: shippingMethod === 'envio' ? notes.trim() : ''
-        },
-        items: cart.map(item => ({ productId: item.product.id, quantity: item.quantity })),
-        website
-      };
-      const { data, error } = await supabase.functions.invoke('create-order', { body: payload });
-      if (error) console.error("Database save failed:", error);
-      */
+      clearCart();
+      setIsCartOpen(false);
+      setToast(savedOrder
+        ? 'Pedido guardado en Mis pedidos. Revisá WhatsApp para enviarlo.'
+        : 'WhatsApp abierto, pero el navegador no permitió guardar el pedido localmente.');
+      setName(''); setPhone(''); setStreet(''); setNeighborhood(''); setFloor(''); setDept(''); setNotes('');
 
     } catch (err) {
       console.error('Error in checkout:', err);
@@ -233,22 +226,29 @@ export default function CartDrawer() {
     }
   };
 
-  const handleConfirmOrderSent = () => {
-    // Clear cart and reset states after user confirms WhatsApp sent
-    clearCart();
-    setName('');
-    setPhone('');
-    setStreet('');
-    setNeighborhood('');
-    setFloor('');
-    setDept('');
-    setNotes('');
-    setOrderResult(null);
-    setIsCartOpen(false);
+  const handleRepeatOrder = (items, mode, unavailableCount) => {
+    if (items.length > 0) addItemsToCart(items, mode);
+    setDrawerView('cart');
+    setToast(unavailableCount > 0
+      ? `Pedido agregado. ${unavailableCount} producto(s) ya no están disponibles.`
+      : 'Pedido agregado al carrito con los precios actuales.');
   };
 
-  const handleBackToCart = () => {
-    setOrderResult(null);
+  const changeConfiguredQuantity = (item, nextQuantity) => {
+    if (nextQuantity <= 0) {
+      handleRemoveFromCart(item.lineKey);
+      return;
+    }
+    if (item.mode === 'free') {
+      const calculation = calculateUnitAndPack(item.product, nextQuantity);
+      if (!calculation) return;
+      updateConfiguredLine(item.lineKey, (current) => ({ ...current, quantity: calculation.totalUnits, cantidadUnidadesTotales: calculation.totalUnits, cantidadPacks: calculation.completePacks, cantidadUnidadesSueltas: calculation.looseUnits, subtotal: calculation.total, breakdown: getReadableBreakdown(calculation) }));
+      return;
+    }
+    const presentation = getValidPresentations(item.product).find((candidate) => candidate.id === item.presentationId);
+    const calculation = calculateClosedPacks(presentation, nextQuantity);
+    if (!calculation) return;
+    updateConfiguredLine(item.lineKey, (current) => ({ ...current, quantity: calculation.packCount, cantidadPacks: calculation.packCount, cantidadUnidadesTotales: calculation.totalUnits, subtotal: calculation.total, breakdown: getReadableBreakdown(calculation), precioPresentacion: presentation.precio }));
   };
 
   const formatter = new Intl.NumberFormat("es-AR", {
@@ -257,17 +257,20 @@ export default function CartDrawer() {
   });
 
   return (
+    <>
+    {toast && <div className="app-toast" role="status">{toast}</div>}
     <div className={`cart-drawer-overlay ${isCartOpen ? 'active' : ''}`} onClick={handleClose}>
       <div className="cart-drawer-content" onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div className="cart-drawer-header">
           <div className="cart-header-title">
             <svg className="cart-header-icon-svg" xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
-            <h2>{orderResult ? 'Pedido listo para enviar' : 'Mi Carrito'}</h2>
-            {!orderResult && <span className="cart-badge">{cartCount}</span>}
+            <h2>{drawerView === 'history' ? 'Mis pedidos' : 'Mi Carrito'}</h2>
+            {drawerView === 'cart' && <span className="cart-badge">{cartCount}</span>}
           </div>
           <div className="cart-header-actions">
-            {!orderResult && cart.length > 0 && (
+            {drawerView === 'cart' && <button type="button" className="cart-history-btn" onClick={() => setDrawerView('history')}>Mis pedidos</button>}
+            {drawerView === 'cart' && cart.length > 0 && (
               <button 
                 type="button" 
                 className="cart-clear-btn" 
@@ -289,52 +292,9 @@ export default function CartDrawer() {
 
         {/* Content */}
         <div className="cart-drawer-body">
-          {orderResult ? (
-            <div className="cart-success-view">
-              <svg className="cart-success-icon-svg" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ color: 'var(--whatsapp)' }}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-              <h3>¡Pedido listo para enviar!</h3>
-              <p className="order-instruction" style={{ marginBottom: '16px' }}>
-                Se ha abierto la ventana de WhatsApp para enviar el mensaje a <strong>{orderResult.whatsappLabel}</strong>.
-              </p>
-              
-              <div className="order-summary-box" style={{ background: 'var(--bg-app)', padding: '16px', borderRadius: 'var(--radius-md)', border: '1px solid var(--border)', marginBottom: '20px', textAlign: 'left' }}>
-                <p style={{ margin: '0 0 8px 0', fontSize: '0.95rem' }}>Cliente: <strong>{name}</strong></p>
-                <p style={{ margin: '0 0 8px 0', fontSize: '0.95rem' }}>Total estimado: <strong>{formatter.format(orderResult.total)}</strong></p>
-                <p style={{ margin: '0', fontSize: '0.85rem', color: 'var(--text-muted)', lineHeight: '1.4' }}>
-                  Si el enlace de WhatsApp no se abrió, haz clic en el botón de abajo para intentar de nuevo.
-                </p>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', width: '100%' }}>
-                <a 
-                  href={orderResult.whatsappUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="btn btn-whatsapp btn-large"
-                  style={{ width: '100%', textDecoration: 'none' }}
-                >
-                  💬 Enviar de nuevo por WhatsApp
-                </a>
-                
-                <button 
-                  type="button" 
-                  className="btn btn-primary"
-                  onClick={handleConfirmOrderSent}
-                  style={{ width: '100%', padding: '12px 24px' }}
-                >
-                  ✓ Confirmar y vaciar carrito
-                </button>
-
-                <button 
-                  type="button" 
-                  className="btn btn-secondary"
-                  onClick={handleBackToCart}
-                  style={{ width: '100%', padding: '10px 24px' }}
-                >
-                  ← Modificar carrito / Volver
-                </button>
-              </div>
-            </div>
+          {migrationNotice && <div className="checkout-error-message cart-migration-notice" role="status">{migrationNotice}<button type="button" onClick={clearMigrationNotice} aria-label="Cerrar aviso">×</button></div>}
+          {drawerView === 'history' ? (
+            <OrderHistory cartHasItems={cart.length > 0} onBack={() => setDrawerView('cart')} onRepeat={handleRepeatOrder} />
           ) : cart.length === 0 ? (
             <div className="cart-empty">
               <svg className="cart-empty-icon-svg" xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"></circle><circle cx="20" cy="21" r="1"></circle><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"></path></svg>
@@ -354,86 +314,118 @@ export default function CartDrawer() {
               <div className="cart-items-list">
                 {cart.map((item, index) => {
                   const product = item.product;
-                  const isRemoving = removingItems.includes(product.id);
+                  const identifier = item.lineKey || product.id;
+                  const isRemoving = removingItems.includes(identifier);
                   const isClearing = isClearingAll;
                   const delay = isClearing ? `${index * 50}ms` : '0ms';
 
                   return (
                     <div 
                       className={`cart-item ${isRemoving ? 'removing' : ''} ${isClearing ? 'clearing' : ''}`} 
-                      key={product.id}
+                      key={identifier}
                       style={{ transitionDelay: delay }}
                     >
-                      <div 
-                        className="cart-item-img-container" 
-                        onClick={() => { navigate(`/${product.slug}`); handleClose(); }}
-                        style={{ cursor: 'pointer' }}
-                        title="Ver detalle del producto"
-                      >
-                        <img 
-                          src={product.imagen_principal || 'https://via.placeholder.com/100?text=Producto'} 
-                          alt={product.nombre}
-                          onError={(e) => {
-                            e.target.onerror = null;
-                            e.target.src = 'https://images.unsplash.com/photo-1542838132-92c53300491e?w=150&auto=format&fit=crop&q=80';
-                          }}
-                        />
-                      </div>
-                      <div className="cart-item-details">
-                        <div className="cart-item-meta">
-                          <span className="cart-item-brand">{product.marca || 'Artesanal'}</span>
-                        </div>
-                        <h4 
-                          className="cart-item-name" 
+                      <div className="cart-item-mobile-header">
+                        <div 
+                          className="cart-item-img-container" 
                           onClick={() => { navigate(`/${product.slug}`); handleClose(); }}
                           style={{ cursor: 'pointer' }}
                           title="Ver detalle del producto"
                         >
-                          {product.nombre}
-                        </h4>
-                        <div className="cart-item-pricing">
-                          <span className="cart-item-price-each">
-                            {formatter.format(product.precio)} c/u
-                          </span>
-                          <span className="cart-item-subtotal">
-                            Subtotal: {formatter.format(product.precio * item.quantity)}
-                          </span>
+                          <img 
+                            src={getProductImage(product)} 
+                            alt={product.nombre}
+                            loading="lazy"
+                            decoding="async"
+                            onError={(e) => {
+                              e.target.onerror = null;
+                              e.target.src = getProductImage({});
+                            }}
+                          />
                         </div>
-                        
+                        <div className="cart-item-mobile-info">
+                          <span className="cart-item-brand">{product.categories?.nombre || 'Minhag Kosher'}</span>
+                          <h4 
+                            className="cart-item-name" 
+                            onClick={() => { navigate(`/${product.slug}`); handleClose(); }}
+                            style={{ cursor: 'pointer' }}
+                            title="Ver detalle del producto"
+                          >
+                            {product.nombre}
+                          </h4>
+                        </div>
+                        <button 
+                          type="button"
+                          className="cart-item-mobile-remove"
+                          onClick={() => handleRemoveFromCart(identifier)}
+                          aria-label={`Eliminar ${product.nombre} del carrito`}
+                          disabled={isSubmitting}
+                        >
+                          <Trash2 size={16} aria-hidden="true" />
+                          <span>Eliminar</span>
+                        </button>
+                      </div>
+
+                      <div className="cart-item-details">
+                        <div className="cart-item-mobile-summary">
+                          {item.mode !== 'traditional' && (
+                            <div className="cart-item-mobile-summary-row">
+                              <span className="cart-item-mobile-label">Presentación</span>
+                              <span className="cart-item-mobile-value">
+                                {item.mode === 'free'
+                                  ? item.breakdown
+                                  : `${item.cantidadPacks} ${item.cantidadPacks === 1 ? 'pack' : 'packs'} ${item.presentationLabel?.replace(/^Pack\s*/i, '') || ''}`}
+                              </span>
+                            </div>
+                          )}
+                          {item.mode === 'traditional' && (
+                            <div className="cart-item-mobile-summary-row">
+                              <span className="cart-item-mobile-label">Precio unitario</span>
+                              <span className="cart-item-mobile-value">{formatter.format(product.precio)}</span>
+                            </div>
+                          )}
+                          <div className="cart-item-mobile-summary-row">
+                            <span className="cart-item-mobile-label">Cantidad total</span>
+                            <span className="cart-item-mobile-value">
+                              {item.mode === 'packs' || item.mode === 'free'
+                                ? `${item.cantidadUnidadesTotales} unidades`
+                                : `${item.quantity} ${item.quantity === 1 ? 'unidad' : 'unidades'}`}
+                            </span>
+                          </div>
+                          <div className="cart-item-mobile-summary-row">
+                            <span className="cart-item-mobile-label">Subtotal</span>
+                            <span className="cart-item-mobile-subtotal">
+                              {formatter.format(item.mode === 'traditional' ? product.precio * item.quantity : item.subtotal)}
+                            </span>
+                          </div>
+                        </div>
+
                         <div className="cart-item-actions">
-                          {/* Quantity Selector */}
-                          <div className="cart-qty-selector">
+                          <div className="cart-item-mobile-controls cart-qty-selector">
                             <button 
                               type="button"
                               className="qty-btn"
-                              onClick={() => handleUpdateQuantity(product.id, item.quantity - 1)}
-                              aria-label="Disminuir cantidad"
+                              onClick={() => item.mode === 'traditional' ? handleUpdateQuantity(identifier, item.quantity - 1) : changeConfiguredQuantity(item, item.quantity - 1)}
+                              aria-label={item.mode === 'packs' ? 'Disminuir cantidad de packs' : 'Disminuir cantidad'}
                               disabled={isSubmitting}
                             >
                               -
                             </button>
-                            <span className="qty-val">{item.quantity}</span>
+                            <span className="qty-val">
+                              {item.mode === 'packs'
+                                ? `${item.quantity} ${item.quantity === 1 ? 'pack' : 'packs'}`
+                                : `${item.quantity} ${item.quantity === 1 ? 'unidad' : 'unidades'}`}
+                            </span>
                             <button 
                               type="button"
                               className="qty-btn"
-                              onClick={() => updateQuantity(product.id, item.quantity + 1)}
-                              aria-label="Aumentar cantidad"
+                              onClick={() => item.mode === 'traditional' ? updateQuantity(identifier, item.quantity + 1) : changeConfiguredQuantity(item, item.quantity + 1)}
+                              aria-label={item.mode === 'packs' ? 'Aumentar cantidad de packs' : 'Aumentar cantidad'}
                               disabled={isSubmitting}
                             >
                               +
                             </button>
                           </div>
-                          
-                          {/* Remove Button */}
-                          <button 
-                            type="button"
-                            className="cart-item-remove"
-                            onClick={() => handleRemoveFromCart(product.id)}
-                            aria-label="Eliminar producto"
-                            disabled={isSubmitting}
-                          >
-                            Eliminar
-                          </button>
                         </div>
                       </div>
                     </div>
@@ -665,5 +657,6 @@ export default function CartDrawer() {
         </div>
       </div>
     </div>
+    </>
   );
 }
