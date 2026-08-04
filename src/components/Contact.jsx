@@ -1,7 +1,6 @@
 import React from 'react';
 import { contactConfig, getWhatsAppLink } from '../data/contactConfig';
 import { branches, isKosherClosedForShabat } from '../data/branches';
-import { business } from '../config/business';
 import BranchMap from './BranchMap';
 
 const WhatsAppIcon = () => (
@@ -86,7 +85,6 @@ export default function Contact() {
                         target="_blank" 
                         rel="noopener noreferrer" 
                         className="method-link" 
-                        style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-title)' }}
                       >
                         {wa.numberDisplay}
                       </a>
@@ -106,33 +104,12 @@ export default function Contact() {
                       target="_blank" 
                       rel="noopener noreferrer" 
                       className="method-link ig-link"
-                      style={{ fontSize: '1.1rem', fontWeight: '700', color: 'var(--text-title)' }}
                     >
                       {ig.label}
                     </a>
                   </div>
                 </div>
               ))}
-            </div>
-
-            <div className="contact-cta-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              {business.whatsapp.map((wa) => {
-                const message = encodeURIComponent("Hola, Minhag Kosher. Quisiera realizar una consulta.");
-                const url = `https://wa.me/${wa.internationalNumber}?text=${message}`;
-                return (
-                  <a 
-                    key={wa.id}
-                    href={url} 
-                    target="_blank" 
-                    rel="noopener noreferrer" 
-                    className="btn btn-whatsapp btn-large"
-                    style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '8px', width: '100%' }}
-                    aria-label={`Enviar mensaje de consulta a ${wa.label} por WhatsApp`}
-                  >
-                    <WhatsAppIcon /> Enviar a {wa.label} ({wa.displayNumber})
-                  </a>
-                );
-              })}
             </div>
           </div>
 

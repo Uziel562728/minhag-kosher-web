@@ -2107,11 +2107,13 @@ main {
 .method-link {
   font-size: 1.1rem;
   font-weight: 700;
-  color: var(--whatsapp-hover);
+  color: var(--primary);
+  text-decoration: underline;
   transition: var(--transition-fast);
 }
 
 .method-link:hover {
+  color: var(--accent);
   text-decoration: underline;
 }
 
