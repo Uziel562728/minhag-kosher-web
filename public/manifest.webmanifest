@@ -1,0 +1,16 @@
+{
+  "name": "Super Market Kosher Admin",
+  "short_name": "SM Kosher Admin",
+  "start_url": "/super-market-web-/admin",
+  "scope": "/super-market-web-/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#e53e3e",
+  "icons": [
+    {
+      "src": "favicon.webp",
+      "sizes": "192x192",
+      "type": "image/webp"
+    }
+  ]
+}
