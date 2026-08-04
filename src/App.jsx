@@ -7,7 +7,6 @@ import Contact from './components/Contact';
 import WhatsAppButton from './components/WhatsAppButton';
 import Footer from './components/Footer';
 import ProductDetail from './components/ProductDetail';
-import logoImg from './images/minhag-logo-transparent.png';
 import './App.css';
 
 // Admin imports
@@ -78,23 +77,6 @@ function PublicLayout() {
 
   return (
     <div className="app-container">
-      {/* Background Watermark Logo */}
-      <div className="bg-watermark">
-        <img src={logoImg} alt="Minhag Kosher Watermark" />
-      </div>
-
-      {/* Global background diagonal animated lines */}
-      <div className="global-bg-lines">
-        <div className="diagonal-line line-g1"></div>
-        <div className="diagonal-line line-g2"></div>
-        <div className="diagonal-line line-g3"></div>
-        <div className="diagonal-line line-g4"></div>
-        <div className="diagonal-line line-g5"></div>
-        <div className="diagonal-line line-g6"></div>
-        <div className="diagonal-line line-g7"></div>
-        <div className="diagonal-line line-g8"></div>
-      </div>
-
       {/* Navigation Header */}
       <Header />
 
