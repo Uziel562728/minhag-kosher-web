@@ -21,6 +21,9 @@ const AdminProducts = lazy(() => import('./components/admin/AdminProducts'));
 const AdminProductForm = lazy(() => import('./components/admin/AdminProductForm'));
 const AdminCategories = lazy(() => import('./components/admin/AdminCategories'));
 const AdminCategoryForm = lazy(() => import('./components/admin/AdminCategoryForm'));
+const AdminCampaigns = lazy(() => import('./components/admin/AdminCampaigns'));
+const AdminCampaignForm = lazy(() => import('./components/admin/AdminCampaignForm'));
+const CampaignFlyerPopup = lazy(() => import('./components/CampaignFlyerPopup'));
 
 const RouteFallback = () => <div className="catalog-loading-inner"><div className="admin-spinner" /><p>Cargando...</p></div>;
 const routerBase = import.meta.env.BASE_URL.replace(/\/$/, '');
@@ -76,6 +79,14 @@ function PublicLayout() {
 
     return () => window.clearTimeout(timer);
   }, [location.search]);
+
+  useEffect(() => {
+    const handleSelectCat = (e) => {
+      setSelectedCategory(e.detail);
+    };
+    window.addEventListener('minhag-select-category', handleSelectCat);
+    return () => window.removeEventListener('minhag-select-category', handleSelectCat);
+  }, []);
 
   return (
     <div className="app-container">
@@ -134,6 +145,9 @@ export default function App() {
             <Route path="categories" element={<AdminCategories />} />
             <Route path="categories/new" element={<AdminCategoryForm />} />
             <Route path="categories/edit/:id" element={<AdminCategoryForm />} />
+            <Route path="campaigns" element={<AdminCampaigns />} />
+            <Route path="campaigns/new" element={<AdminCampaignForm />} />
+            <Route path="campaigns/edit/:id" element={<AdminCampaignForm />} />
             <Route path="*" element={<Navigate to="/admin/products" replace />} />
           </Route>
 
@@ -142,6 +156,7 @@ export default function App() {
         </Routes></Suspense>
         <CartDrawer />
         <FloatingCartButton />
+        <CampaignFlyerPopup />
       </CartProvider>
     </Router>
   );

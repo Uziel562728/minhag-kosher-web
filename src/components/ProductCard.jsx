@@ -7,10 +7,11 @@ import { motion, useReducedMotion } from 'motion/react';
 import { saveCatalogState } from '../utils/catalogNavigationState';
 import { getLowestPresentationPrice, hasValidPresentations, onlyAllowsClosedPacks } from '../utils/productPresentations';
 import { getProductSectionLabel } from '../config/productSections';
+import { getProductPromotionDetails } from '../utils/promotionResolver';
 
 export default function ProductCard({ product, categories = [], catalogState, isRestoreTarget = false }) {
   const navigate = useNavigate();
-  const { cart, addToCart, updateQuantity } = useCart();
+  const { cart, addToCart, updateQuantity, promotions, relations } = useCart();
   const { cardRef, handleMouseEnter, handlePointerDown } = useProductCardPreload(product, categories);
   const cartItem = cart.find((item) => item.product.id === product.id && item.mode === 'traditional');
   const quantity = cartItem ? cartItem.quantity : 0;
@@ -49,16 +50,31 @@ export default function ProductCard({ product, categories = [], catalogState, is
   const hasPresentations = hasValidPresentations(product);
   const lowestPrice = getLowestPresentationPrice(product);
 
-  // Calculate discount percentage if previous price exists
-  const discount = precio_anterior && precio_anterior > precio
-    ? Math.round(((precio_anterior - precio) / precio_anterior) * 100)
+  // 1. Resolve promotion details using global context state
+  const promoDetails = getProductPromotionDetails(product, promotions, relations);
+
+  // Calculate final unit prices
+  const finalUnitPrice = promoDetails.hasPromotion && !promoDetails.isVolumetric
+    ? promoDetails.promoPrice
+    : (hasPresentations ? lowestPrice : precio);
+
+  const displayOriginalPrice = promoDetails.hasPromotion && !promoDetails.isVolumetric
+    ? promoDetails.originalPrice
+    : (precio_anterior && precio_anterior > precio ? precio_anterior : null);
+
+  const hasVolumetricPromo = promoDetails.hasPromotion && promoDetails.isVolumetric;
+
+  // Calculate sutil discount percentage for simple promos
+  const discountPercent = displayOriginalPrice && displayOriginalPrice > finalUnitPrice
+    ? Math.round(((displayOriginalPrice - finalUnitPrice) / displayOriginalPrice) * 100)
     : 0;
+
 
   return (
     <motion.div
       ref={cardRef}
       id={`product-card-${product.id}`}
-      className={`product-card ${product.slug ? 'product-card-clickable' : ''} ${oferta ? 'product-on-sale' : ''} ${!disponible ? 'product-out-of-stock' : ''} ${isRestoreTarget ? 'product-card-restore-highlight' : ''}`}
+      className={`product-card ${product.slug ? 'product-card-clickable' : ''} ${(oferta || promoDetails.hasPromotion) ? 'product-on-sale' : ''} ${!disponible ? 'product-out-of-stock' : ''} ${isRestoreTarget ? 'product-card-restore-highlight' : ''}`}
       initial={false}
       animate={isRestoreTarget && !reduceMotion ? { opacity: [0.72, 1], scale: [0.98, 1] } : { opacity: 1, scale: 1 }}
       transition={{ duration: reduceMotion ? 0 : 0.5, ease: 'easeOut' }}
@@ -74,8 +90,15 @@ export default function ProductCard({ product, categories = [], catalogState, is
     >
       {/* Badges */}
       <div className="product-badges">
-        {oferta && <span className="badge-offer">🔥 OFERTA</span>}
-        {discount > 0 && <span className="badge-discount">-{discount}%</span>}
+        {/* Dynamic Promotion Badge */}
+        {promoDetails.hasPromotion && (
+          <span className="badge-discount" style={{ backgroundColor: '#ef4444', fontWeight: 'bold' }}>
+            {promoDetails.badgeText}
+          </span>
+        )}
+        {/* Fallback offer tag if no campaign active but checked as offer */}
+        {!promoDetails.hasPromotion && oferta && <span className="badge-offer">🔥 OFERTA</span>}
+        {!promoDetails.hasPromotion && discountPercent > 0 && <span className="badge-discount">-{discountPercent}%</span>}
         {!disponible && <span className="badge-stock">Sin Stock</span>}
       </div>
 
@@ -108,12 +131,30 @@ export default function ProductCard({ product, categories = [], catalogState, is
         <h3 className="product-name" title={nombre}>{nombre}</h3>
         {descripcion && <p className="product-description">{descripcion}</p>}
         
+        {/* Custom promotion label */}
+        {promoDetails.hasPromotion && promoDetails.textLabel && (
+          <div style={{ color: '#ef4444', fontSize: '0.75rem', fontWeight: 'bold', marginBottom: '4px' }}>
+            🎉 {promoDetails.textLabel}
+          </div>
+        )}
+
         {/* Prices */}
         <div className="product-price-section">
-          {precio_anterior && precio_anterior > precio && (
-            <span className="price-old">${precio_anterior.toLocaleString('es-AR')}</span>
+          {displayOriginalPrice && displayOriginalPrice > finalUnitPrice && (
+            <span className="price-old">${displayOriginalPrice.toLocaleString('es-AR')}</span>
           )}
-          <span className="price-current">{hasPresentations ? 'Desde ' : ''}${(hasPresentations ? lowestPrice : precio).toLocaleString('es-AR')}{hasPresentations && onlyAllowsClosedPacks(product) ? ' por pack' : ''}</span>
+          
+          <span className="price-current">
+            {hasPresentations ? 'Desde ' : ''}
+            ${finalUnitPrice.toLocaleString('es-AR')}
+            {hasPresentations && onlyAllowsClosedPacks(product) ? ' por pack' : ''}
+          </span>
+
+          {hasVolumetricPromo && (
+            <div style={{ fontSize: '0.7rem', color: '#10b981', fontWeight: 'bold', marginTop: '2px' }}>
+              Promoción activa: {promoDetails.badgeText} en carrito
+            </div>
+          )}
         </div>
 
         {/* Action Button / Quantity Selector */}

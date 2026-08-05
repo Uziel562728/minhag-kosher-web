@@ -1,6 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { buildCartLineKey } from '../utils/productPresentations';
+import { fetchActivePromotions } from '../services/promotionService';
+import { resolveCartLineTotals } from '../utils/promotionResolver';
 
 const CartContext = createContext();
 const CART_STORAGE_KEY = 'minhag_cart_v2';
@@ -42,6 +44,117 @@ export function CartProvider({ children }) {
   const [migrationNotice, setMigrationNotice] = useState(() => initialCart.notice || (initialCart.removed > 0
     ? `Se quitaron ${initialCart.removed} artículo(s) antiguos incompatibles del carrito.`
     : ''));
+
+  // Campaigns & Promotions State loaded globally
+  const [promotions, setPromotions] = useState([]);
+  const [campaigns, setCampaigns] = useState([]); // All campaigns (popup + promocion)
+  const [relations, setRelations] = useState([]);
+  const [promotionsLoading, setPromotionsLoading] = useState(true);
+  const [cartNotification, setCartNotification] = useState('');
+
+  // Refs to avoid concurrent queries and access latest values
+  const isRefreshing = useRef(false);
+  const cartRef = useRef(cart);
+  const promotionsRef = useRef(promotions);
+  const relationsRef = useRef(relations);
+
+  useEffect(() => {
+    cartRef.current = cart;
+  }, [cart]);
+
+  useEffect(() => {
+    promotionsRef.current = promotions;
+  }, [promotions]);
+
+  useEffect(() => {
+    relationsRef.current = relations;
+  }, [relations]);
+
+  // Centralized Refresh Function
+  const refreshActivePromotions = useCallback(async (isSilent = false) => {
+    if (isRefreshing.current) {
+      return { promotions: promotionsRef.current, relations: relationsRef.current };
+    }
+    isRefreshing.current = true;
+
+    if (!isSilent) {
+      setPromotionsLoading(true);
+    }
+
+    let result = { promotions: promotionsRef.current, relations: relationsRef.current };
+
+    try {
+      // Force refresh without cache
+      const data = await fetchActivePromotions(true);
+      
+      const newPromos = data.promotions || [];
+      const newCampaigns = data.campaigns || [];
+      const newRels = data.relations || [];
+
+      // Calculate totals to see if promotions changed prices for cart items
+      const currentCart = cartRef.current;
+      if (currentCart.length > 0) {
+        const totalOld = currentCart.reduce((total, item) => {
+          const totals = resolveCartLineTotals(item, promotionsRef.current, relationsRef.current);
+          return total + totals.promoSubtotal;
+        }, 0);
+
+        const totalNew = currentCart.reduce((total, item) => {
+          const totals = resolveCartLineTotals(item, newPromos, newRels);
+          return total + totals.promoSubtotal;
+        }, 0);
+
+        if (totalNew > totalOld) {
+          setCartNotification("Una promoción terminó y el total del carrito fue actualizado.");
+          // Auto clear notification after 8 seconds
+          setTimeout(() => setCartNotification(''), 8000);
+        } else if (totalNew < totalOld) {
+          setCartNotification("Se aplicó una nueva promoción a tu carrito.");
+          setTimeout(() => setCartNotification(''), 8000);
+        }
+      }
+
+      setPromotions(newPromos);
+      setCampaigns(newCampaigns);
+      setRelations(newRels);
+      result = { promotions: newPromos, relations: newRels };
+    } catch (err) {
+      console.warn('Error refreshing campaigns and promotions:', err);
+      // Keep existing states on query failure (fail-safe)
+    } finally {
+      setPromotionsLoading(false);
+      isRefreshing.current = false;
+    }
+
+    return result;
+  }, []);
+
+  // Initial load
+  useEffect(() => {
+    refreshActivePromotions(false);
+  }, [refreshActivePromotions]);
+
+  // Polling (every 15 seconds) & Visibility/Focus Listeners
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshActivePromotions(true);
+    }, 15000);
+
+    const handleInteraction = () => {
+      if (document.visibilityState === 'visible') {
+        refreshActivePromotions(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleInteraction);
+    window.addEventListener('focus', handleInteraction);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleInteraction);
+      window.removeEventListener('focus', handleInteraction);
+    };
+  }, [refreshActivePromotions]);
 
   const isCartOpen = location.hash === '#cart';
 
@@ -135,9 +248,12 @@ export function CartProvider({ children }) {
   };
 
   const cartCount = cart.reduce((total, item) => total + (item.cantidadUnidadesTotales || item.quantity || 0), 0);
-  const cartTotal = cart.reduce((total, item) => total + (item.mode === 'traditional'
-    ? item.product.precio * item.quantity
-    : item.subtotal || 0), 0);
+  
+  // Dynamic calculation using active promotions
+  const cartTotal = cart.reduce((total, item) => {
+    const lineTotals = resolveCartLineTotals(item, promotions, relations);
+    return total + lineTotals.promoSubtotal;
+  }, 0);
 
   return (
     <CartContext.Provider
@@ -156,6 +272,13 @@ export function CartProvider({ children }) {
         setIsCartOpen,
         migrationNotice,
         clearMigrationNotice: () => setMigrationNotice(''),
+        promotions,
+        campaigns,
+        relations,
+        promotionsLoading,
+        cartNotification,
+        clearCartNotification: () => setCartNotification(''),
+        refreshActivePromotions
       }}
     >
       {children}

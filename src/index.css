@@ -6985,6 +6985,168 @@ main {
   }
 }
 
+/* ==========================================================================
+   Admin Dark Theme Color Scheme Overrides
+   ========================================================================== */
+.admin-dashboard-layout.admin-dashboard {
+  background-color: #0f172a !important;
+}
+
+.admin-dashboard .admin-content-header {
+  background-color: #1e293b !important;
+  border-bottom: 1px solid #334155 !important;
+}
+
+.admin-dashboard .admin-content-header h2 {
+  color: #ffffff !important;
+}
+
+.admin-dashboard .admin-badge {
+  background-color: #334155 !important;
+  color: #38bdf8 !important;
+  border: 1px solid #475569 !important;
+}
+
+.admin-dashboard .view-action-header h3 {
+  color: #ffffff !important;
+}
+
+.admin-dashboard input[type="text"],
+.admin-dashboard input[type="number"],
+.admin-dashboard input[type="email"],
+.admin-dashboard input[type="datetime-local"],
+.admin-dashboard input[type="date"],
+.admin-dashboard input[type="time"],
+.admin-dashboard select,
+.admin-dashboard textarea {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+  border: 1px solid #475569 !important;
+}
+
+.admin-dashboard input::placeholder,
+.admin-dashboard textarea::placeholder {
+  color: #94a3b8 !important;
+  opacity: 1;
+}
+
+.admin-dashboard input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.admin-dashboard input[type="number"]::-webkit-inner-spin-button,
+.admin-dashboard input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.admin-dashboard input:focus-visible,
+.admin-dashboard select:focus-visible,
+.admin-dashboard textarea:focus-visible,
+.admin-dashboard button:focus-visible {
+  outline: 2px solid #38bdf8;
+  outline-offset: 2px;
+}
+
+.admin-dashboard label {
+  color: #cbd5e1 !important;
+}
+
+.admin-dashboard .help-text {
+  color: #94a3b8 !important;
+}
+
+.admin-dashboard select option {
+  background-color: #1e293b !important;
+  color: #ffffff !important;
+}
+
+.admin-dashboard .admin-form-section {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+.admin-dashboard .section-subtitle-admin {
+  color: #ffffff !important;
+}
+
+.admin-dashboard .error-text {
+  color: #f87171 !important;
+}
+
+.admin-dashboard .admin-error-alert {
+  background-color: rgba(239, 68, 68, 0.1) !important;
+  border-color: rgba(239, 68, 68, 0.2) !important;
+  color: #f87171 !important;
+}
+
+/* Image selector dark styling overrides */
+.admin-dashboard .campaign-image-selector {
+  background-color: #1e293b !important;
+  border: 1px solid #334155 !important;
+}
+
+.admin-dashboard .campaign-image-selector .selector-tabs button {
+  background-color: #0f172a !important;
+  border: 1px solid #334155 !important;
+  color: #cbd5e1 !important;
+}
+
+.admin-dashboard .campaign-image-selector .selector-tabs button.btn-primary {
+  background-color: var(--primary) !important;
+  border-color: var(--primary) !important;
+  color: #ffffff !important;
+}
+
+.admin-dashboard .campaign-image-selector .drag-drop-zone {
+  background-color: #0f172a !important;
+  border-color: #475569 !important;
+}
+
+.admin-dashboard .campaign-image-selector .drag-drop-zone label span {
+  color: #ffffff !important;
+}
+
+.admin-dashboard .campaign-image-selector .selected-image-status {
+  background-color: #0f172a !important;
+  border: 1px solid #334155 !important;
+}
+
+.admin-dashboard .campaign-image-selector .selected-image-status div {
+  color: #ffffff !important;
+}
+
+.admin-dashboard .campaign-image-selector .library-thumbnails-grid div {
+  border-color: #334155 !important;
+  background-color: #0f172a !important;
+}
+
+/* Responsive Campaign Table */
+@media (max-width: 1000px) {
+  .admin-campaign-priority {
+    display: none !important;
+  }
+}
+
+/* Responsive Campaign Thumbnails */
+@media (max-width: 1024px) {
+  .campaign-thumbnail-img, .campaign-thumbnail-placeholder {
+    width: 60px !important;
+    height: 60px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .campaign-thumbnail-img, .campaign-thumbnail-placeholder {
+    width: 80px !important;
+    height: 80px !important;
+    max-width: 100px !important;
+    max-height: 100px !important;
+  }
+}
+
+
 
 
 

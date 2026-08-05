@@ -10,10 +10,14 @@ export default function AdminLogin() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // If session already exists, skip login and redirect to admin
+    // If session already exists, skip login and redirect to admin if admin role is verified
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate('/admin', { replace: true });
+        if (session.user?.app_metadata?.role === 'admin') {
+          navigate('/admin', { replace: true });
+        } else {
+          supabase.auth.signOut();
+        }
       }
     });
   }, [navigate]);
@@ -24,13 +28,18 @@ export default function AdminLogin() {
     setErrorMsg('');
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data: { session }, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) {
         throw error;
+      }
+
+      if (session?.user?.app_metadata?.role !== 'admin') {
+        await supabase.auth.signOut();
+        throw new Error('Acceso no autorizado. Se requieren credenciales de administrador.');
       }
 
       navigate('/admin', { replace: true });

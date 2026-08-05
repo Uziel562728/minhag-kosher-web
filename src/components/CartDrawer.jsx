@@ -9,6 +9,7 @@ import { saveOrderToHistory } from '../utils/orderHistory';
 import { buildWhatsAppOrderMessage } from '../utils/whatsappOrderMessage';
 import OrderHistory from './OrderHistory';
 import { calculateClosedPacks, calculateUnitAndPack, getReadableBreakdown, getValidPresentations } from '../utils/productPresentations';
+import { resolveCartLineTotals } from '../utils/promotionResolver';
 
 export default function CartDrawer() {
   const {
@@ -23,7 +24,12 @@ export default function CartDrawer() {
     clearCart,
     addItemsToCart,
     migrationNotice,
-    clearMigrationNotice
+    clearMigrationNotice,
+    promotions,
+    relations,
+    cartNotification,
+    clearCartNotification,
+    refreshActivePromotions
   } = useCart();
 
   const navigate = useNavigate();
@@ -99,48 +105,43 @@ export default function CartDrawer() {
   }, [toast]);
 
   const validateForm = () => {
-    const tempErrors = {};
-    if (!name.trim()) tempErrors.name = 'El nombre y apellido son obligatorios';
-    
-    const phoneTrimmed = phone.trim();
-    if (!phoneTrimmed) {
-      tempErrors.phone = 'El teléfono es obligatorio';
+    const nextErrors = {};
+    if (!name.trim()) nextErrors.name = 'El nombre es obligatorio.';
+    if (!phone.trim()) {
+      nextErrors.phone = 'El teléfono es obligatorio.';
     } else {
-      // Basic Argentine mobile / landline format check
-      const phoneRegex = /^[0-9+\s\-()]{6,25}$/;
-      if (!phoneRegex.test(phoneTrimmed)) {
-        tempErrors.phone = 'Formato de teléfono inválido (ej: 11 2345-6789)';
-      }
+      const cleanPhone = phone.replace(/[^0-9+]/g, '');
+      if (cleanPhone.length < 8) nextErrors.phone = 'El número de teléfono parece inválido.';
     }
-    
+
     if (shippingMethod === 'envio') {
-      if (!street.trim()) tempErrors.street = 'La calle y altura son obligatorias';
-      if (!neighborhood.trim()) tempErrors.neighborhood = 'El barrio o localidad es obligatorio';
+      if (!street.trim()) nextErrors.street = 'La calle y altura son obligatorias.';
+      if (!neighborhood.trim()) nextErrors.neighborhood = 'El barrio es obligatorio.';
     }
-    
-    setErrors(tempErrors);
-    return Object.keys(tempErrors).length === 0;
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
   };
 
-  const buildWhatsAppUrl = (phoneNumber, message) => {
-    const cleanPhone = phoneNumber.replace(/[^0-9]/g, '');
-    const encodedText = encodeURIComponent(message);
-    return `https://wa.me/${cleanPhone}?text=${encodedText}`;
+  const buildWhatsAppUrl = (internationalNumber, text) => {
+    const cleanNumber = internationalNumber.replace(/[^0-9]/g, '');
+    const encodedText = encodeURIComponent(text);
+    return `https://api.whatsapp.com/send?phone=${cleanNumber}&text=${encodedText}`;
   };
 
-  const handleCheckout = (e) => {
+  const handleCheckout = async (e) => {
     e.preventDefault();
     if (isSubmitting) return;
-    if (!validateForm()) return;
 
-    if (!isWhatsAppConfigured) {
-      setSubmitError('El número de WhatsApp todavía no está configurado.');
+    if (website.trim()) {
+      setToast('Pedido procesado con éxito (bot).');
+      clearCart();
+      setIsCartOpen(false);
       return;
     }
 
-    // Honeypot check
-    if (website) {
-      console.warn("Honeypot triggered");
+    if (!validateForm()) {
+      setSubmitError('Revisá los datos ingresados en el formulario.');
       return;
     }
 
@@ -148,6 +149,27 @@ export default function CartDrawer() {
     setSubmitError(null);
 
     try {
+      // 1. Force fresh fetch of active campaigns and relations right before sending to WhatsApp
+      const freshData = await refreshActivePromotions(true);
+      const freshPromos = freshData?.promotions || promotions;
+      const freshRels = freshData?.relations || relations;
+
+      // 2. Resolve dynamic item subtotals using the newly fetched active promotions
+      const processedCart = cart.map(item => {
+        const totals = resolveCartLineTotals(item, freshPromos, freshRels);
+        return {
+          ...item,
+          originalSubtotal: totals.originalSubtotal,
+          promoSubtotal: totals.promoSubtotal,
+          promoApplied: totals.promoApplied,
+          badgeText: totals.badgeText,
+          discountAmount: totals.discountAmount
+        };
+      });
+
+      // 3. Calculate fresh dynamic cart total
+      const freshCartTotal = processedCart.reduce((total, item) => total + item.promoSubtotal, 0);
+
       const orderData = {
         name: name.trim(),
         phone: phone.trim(),
@@ -157,8 +179,8 @@ export default function CartDrawer() {
         floor: shippingMethod === 'envio' ? floor.trim() : '',
         dept: shippingMethod === 'envio' ? dept.trim() : '',
         notes: shippingMethod === 'envio' ? notes.trim() : '',
-        cart,
-        cartTotal
+        cart: processedCart,
+        cartTotal: freshCartTotal
       };
 
       // Generate order message and link
@@ -173,7 +195,7 @@ export default function CartDrawer() {
       try {
         whatsappWindow.opener = null;
       } catch {
-        // Some browsers prevent changing opener after creating the tab.
+        // Ignore
       }
 
       const savedOrder = saveOrderToHistory({
@@ -204,7 +226,7 @@ export default function CartDrawer() {
           breakdown: item.breakdown || '',
           precioUnitario: item.precioUnitario ?? Number(item.product.precio),
           precioPresentacion: item.precioPresentacion ?? null,
-          subtotal: item.mode === 'traditional' ? Number(item.product.precio) * item.quantity : item.subtotal,
+          subtotal: item.promoSubtotal, // Use promotional subtotal here
         })),
         subtotal: orderData.cartTotal,
         shippingCost: orderData.shippingMethod === 'envio' ? null : 0,
@@ -293,6 +315,16 @@ export default function CartDrawer() {
         {/* Content */}
         <div className="cart-drawer-body">
           {migrationNotice && <div className="checkout-error-message cart-migration-notice" role="status">{migrationNotice}<button type="button" onClick={clearMigrationNotice} aria-label="Cerrar aviso">×</button></div>}
+          {cartNotification && (
+            <div 
+              className="checkout-error-message cart-migration-notice" 
+              style={{ backgroundColor: 'rgba(56, 189, 248, 0.12)', color: '#38bdf8', borderColor: 'rgba(56, 189, 248, 0.2)' }}
+              role="status"
+            >
+              {cartNotification}
+              <button type="button" onClick={clearCartNotification} aria-label="Cerrar aviso">×</button>
+            </div>
+          )}
           {drawerView === 'history' ? (
             <OrderHistory cartHasItems={cart.length > 0} onBack={() => setDrawerView('cart')} onRepeat={handleRepeatOrder} />
           ) : cart.length === 0 ? (
@@ -318,6 +350,10 @@ export default function CartDrawer() {
                   const isRemoving = removingItems.includes(identifier);
                   const isClearing = isClearingAll;
                   const delay = isClearing ? `${index * 50}ms` : '0ms';
+
+                  // Calculate promotional values dynamically
+                  const totals = resolveCartLineTotals(item, promotions, relations);
+                  const hasPromo = totals.discountAmount > 0;
 
                   return (
                     <div 
@@ -353,6 +389,22 @@ export default function CartDrawer() {
                           >
                             {product.nombre}
                           </h4>
+                          {hasPromo && (
+                            <span 
+                              style={{ 
+                                display: 'inline-block', 
+                                backgroundColor: 'rgba(239, 68, 68, 0.12)', 
+                                color: '#ef4444', 
+                                fontSize: '0.68rem', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                fontWeight: 'bold',
+                                marginTop: '4px'
+                              }}
+                            >
+                              🎉 Promo {totals.badgeText} aplicada
+                            </span>
+                          )}
                         </div>
                         <button 
                           type="button"
@@ -381,7 +433,20 @@ export default function CartDrawer() {
                           {item.mode === 'traditional' && (
                             <div className="cart-item-mobile-summary-row">
                               <span className="cart-item-mobile-label">Precio unitario</span>
-                              <span className="cart-item-mobile-value">{formatter.format(product.precio)}</span>
+                              <span className="cart-item-mobile-value">
+                                {hasPromo && totals.promoApplied.tipo_descuento !== 'compra_x_paga_y' ? (
+                                  <>
+                                    <span style={{ textDecoration: 'line-through', opacity: '0.6', marginRight: '6px' }}>
+                                      {formatter.format(product.precio)}
+                                    </span>
+                                    <span style={{ color: '#ef4444', fontWeight: 'bold' }}>
+                                      {formatter.format(totals.promoSubtotal / item.quantity)}
+                                    </span>
+                                  </>
+                                ) : (
+                                  formatter.format(product.precio)
+                                )}
+                              </span>
                             </div>
                           )}
                           <div className="cart-item-mobile-summary-row">
@@ -395,7 +460,18 @@ export default function CartDrawer() {
                           <div className="cart-item-mobile-summary-row">
                             <span className="cart-item-mobile-label">Subtotal</span>
                             <span className="cart-item-mobile-subtotal">
-                              {formatter.format(item.mode === 'traditional' ? product.precio * item.quantity : item.subtotal)}
+                              {hasPromo ? (
+                                <>
+                                  <span style={{ textDecoration: 'line-through', opacity: '0.5', fontSize: '0.78rem', marginRight: '8px' }}>
+                                    {formatter.format(totals.originalSubtotal)}
+                                  </span>
+                                  <span style={{ color: '#10b981', fontWeight: 'bold' }}>
+                                    {formatter.format(totals.promoSubtotal)}
+                                  </span>
+                                </>
+                              ) : (
+                                formatter.format(totals.originalSubtotal)
+                              )}
                             </span>
                           </div>
                         </div>

@@ -20,11 +20,12 @@ import {
   resolveProductSlug,
 } from '../utils/productPresentations';
 import { getProductSectionLabel } from '../config/productSections';
+import { getProductPromotionDetails } from '../utils/promotionResolver';
 
 export default function ProductDetail() {
   const { slug } = useParams();
   
-  // Instant synchronous cache check (0ms latency - no loading flash)
+  // Instant check (0ms latency)
   const [product, setProduct] = useState(() => getCachedProduct(slug) || getCachedProduct(resolveProductSlug(slug)));
   const [loading, setLoading] = useState(() => !(getCachedProduct(slug) || getCachedProduct(resolveProductSlug(slug))));
   const [notFound, setNotFound] = useState(false);
@@ -32,12 +33,11 @@ export default function ProductDetail() {
   const [totalUnits, setTotalUnits] = useState(1);
   const [packCount, setPackCount] = useState(1);
   const [selectedPresentationId, setSelectedPresentationId] = useState('');
-  const { cart, addToCart, addConfiguredLine, updateQuantity } = useCart();
+  const { cart, addToCart, addConfiguredLine, updateQuantity, promotions, relations } = useCart();
   const navigate = useNavigate();
   const location = useLocation();
   const reduceMotion = useReducedMotion();
 
-  // Instant scroll position reset BEFORE paint (prevents any bottom-to-top scroll animation)
   useLayoutEffect(() => {
     const docEl = document.documentElement;
     const prevScrollBehavior = docEl.style.scrollBehavior;
@@ -72,7 +72,6 @@ export default function ProductDetail() {
     let isMounted = true;
 
     const loadProduct = async () => {
-      // Check if already in memory
       const resolvedSlug = resolveProductSlug(slug);
       const syncProduct = getCachedProduct(slug) || getCachedProduct(resolvedSlug);
       if (syncProduct) {
@@ -108,7 +107,6 @@ export default function ProductDetail() {
         if (loadedProduct) {
           setProduct(loadedProduct);
           setNotFound(false);
-          // Preload remaining gallery images if any
           if (Array.isArray(loadedProduct.imagenes_adicionales)) {
             loadedProduct.imagenes_adicionales.forEach((imgUrl) => {
               if (imgUrl) preloadProductImages({ imagen_principal: imgUrl });
@@ -161,8 +159,7 @@ export default function ProductDetail() {
       );
     }
 
-
-    const cartItem = cart.find((item) => item.product.id === product.id);
+    const cartItem = cart.find((item) => item.product.id === product.id && item.mode === 'traditional');
     const quantity = cartItem ? cartItem.quantity : 0;
     const validPresentations = getValidPresentations(product);
     const hasPresentations = hasValidPresentations(product);
@@ -170,9 +167,97 @@ export default function ProductDetail() {
     const closedPacks = onlyAllowsClosedPacks(product);
     const packPresentations = validPresentations.filter((presentation) => presentation.tipo === 'pack');
     const selectedPresentation = packPresentations.find((presentation) => presentation.id === selectedPresentationId) || packPresentations[0];
+    
+    // Original calculations
     const freeCalculation = freeQuantity ? calculateUnitAndPack(product, totalUnits) : null;
     const packCalculation = closedPacks ? calculateClosedPacks(selectedPresentation, packCount) : null;
     const packHasAdvantage = Boolean(freeCalculation?.pack && freeCalculation.pack.precio < freeCalculation.unit.precio * freeCalculation.pack.cantidad_unidades);
+    
+    // Resolve dynamic promotions for product
+    const promoDetails = getProductPromotionDetails(product, promotions, relations);
+    
+    // Calculate promotional prices for free presentations
+    let promoUnitVal = freeCalculation ? freeCalculation.unit.precio : product.precio;
+    let promoPackVal = freeCalculation?.pack ? freeCalculation.pack.precio : 0;
+    let hasVolumetric = false;
+
+    if (promoDetails.hasPromotion) {
+      const promo = promoDetails.promo;
+      if (promo.tipo_descuento === 'compra_x_paga_y') {
+        hasVolumetric = true;
+      } else {
+        if (freeCalculation) {
+          // Resolve promotion for unit presentation specifically
+          const unitDetails = getProductPromotionDetails(product, promotions, relations, freeCalculation.unit);
+          promoUnitVal = unitDetails.promoPrice;
+          
+          if (freeCalculation.pack) {
+            const packDetails = getProductPromotionDetails(product, promotions, relations, freeCalculation.pack);
+            promoPackVal = packDetails.promoPrice;
+          }
+        } else {
+          promoUnitVal = promoDetails.promoPrice;
+        }
+      }
+    }
+
+    // Recalculate Subtotals for FREE mode under promotions rules
+    let finalFreeUnitSubtotal = 0;
+    let finalFreePackSubtotal = 0;
+    let finalFreeTotal = 0;
+
+    if (freeCalculation) {
+      const originalUnitSubtotal = freeCalculation.looseUnits * freeCalculation.unit.precio;
+      const originalPackSubtotal = freeCalculation.completePacks * (freeCalculation.pack?.precio || 0);
+      finalFreeUnitSubtotal = originalUnitSubtotal;
+      finalFreePackSubtotal = originalPackSubtotal;
+
+      if (promoDetails.hasPromotion) {
+        const promo = promoDetails.promo;
+        if (promo.tipo_descuento === 'compra_x_paga_y') {
+          const buyX = Math.max(1, Number(promo.cantidad_compra) || 1);
+          const payY = Math.max(1, Number(promo.cantidad_paga) || 1);
+          const loose = freeCalculation.looseUnits;
+          if (loose >= buyX) {
+            const groups = Math.floor(loose / buyX);
+            const rem = loose % buyX;
+            finalFreeUnitSubtotal = ((groups * payY) + rem) * freeCalculation.unit.precio;
+          }
+        } else {
+          finalFreeUnitSubtotal = freeCalculation.looseUnits * promoUnitVal;
+          if (freeCalculation.pack) {
+            finalFreePackSubtotal = freeCalculation.completePacks * promoPackVal;
+          }
+        }
+      }
+      finalFreeTotal = finalFreeUnitSubtotal + finalFreePackSubtotal;
+    }
+
+    // Recalculate Subtotals for PACK mode under promotions rules
+    let finalPackTotal = 0;
+    if (packCalculation && selectedPresentation) {
+      const originalTotal = packCalculation.total;
+      finalPackTotal = originalTotal;
+
+      if (promoDetails.hasPromotion) {
+        const promo = promoDetails.promo;
+        if (promo.tipo_descuento === 'compra_x_paga_y') {
+          const buyX = Math.max(1, Number(promo.cantidad_compra) || 1);
+          const payY = Math.max(1, Number(promo.cantidad_paga) || 1);
+          const count = packCalculation.packCount;
+          if (count >= buyX) {
+            const groups = Math.floor(count / buyX);
+            const rem = count % buyX;
+            finalPackTotal = ((groups * payY) + rem) * selectedPresentation.precio;
+          }
+        } else {
+          const packPromoDetails = getProductPromotionDetails(product, promotions, relations, selectedPresentation);
+          finalPackTotal = packCalculation.packCount * packPromoDetails.promoPrice;
+        }
+      }
+    }
+
+
     const additionalImages = Array.isArray(product.imagenes_adicionales)
       ? product.imagenes_adicionales
       : [];
@@ -251,37 +336,87 @@ export default function ProductDetail() {
 
         <div className="product-detail-info">
           <a href="/" onClick={handleBack} className="product-detail-back">← Volver al catálogo</a>
+          
           <div className="product-detail-tags">
-            {product.oferta && <span className="badge-offer">🔥 OFERTA</span>}
+            {promoDetails.hasPromotion && (
+              <span className="badge-discount" style={{ backgroundColor: '#ef4444', color: '#fff', fontWeight: 'bold' }}>
+                {promoDetails.badgeText}
+              </span>
+            )}
+            {!promoDetails.hasPromotion && product.oferta && <span className="badge-offer">🔥 OFERTA</span>}
             <span className={`detail-stock ${product.disponible ? 'available' : 'unavailable'}`}>
               {product.disponible ? 'Disponible' : 'Sin stock'}
             </span>
           </div>
+
           {product.seccion && (
             <span className="product-detail-brand">
-                {getProductSectionLabel(product.seccion, product.categories?.slug)}
+              {getProductSectionLabel(product.seccion, product.categories?.slug)}
             </span>
           )}
           <h1>{product.nombre}</h1>
           {product.categories?.nombre && (
             <span className="product-detail-category">{product.categories.nombre}</span>
           )}
+          
+          {/* Custom label banner */}
+          {promoDetails.hasPromotion && promoDetails.textLabel && (
+            <div style={{ color: '#ef4444', fontSize: '0.82rem', fontWeight: 'bold', margin: '6px 0' }}>
+              🎉 {promoDetails.textLabel}
+            </div>
+          )}
+
+          {/* Pricing Header */}
           <div className="product-detail-prices">
-            {!hasPresentations && product.precio_anterior > product.precio && (
+            {!hasPresentations && promoDetails.hasPromotion && !promoDetails.isVolumetric && (
+              <span className="price-old">${Number(promoDetails.originalPrice).toLocaleString('es-AR')}</span>
+            )}
+            {!hasPresentations && !promoDetails.hasPromotion && product.precio_anterior > product.precio && (
               <span className="price-old">${Number(product.precio_anterior).toLocaleString('es-AR')}</span>
             )}
-            <span className="price-current">{hasPresentations ? 'Desde ' : ''}${Number(hasPresentations ? getLowestPresentationPrice(product) : product.precio).toLocaleString('es-AR')}</span>
+            
+            <span className="price-current">
+              {hasPresentations ? 'Desde ' : ''}
+              ${(promoDetails.hasPromotion && !promoDetails.isVolumetric ? promoDetails.promoPrice : (hasPresentations ? getLowestPresentationPrice(product) : product.precio)).toLocaleString('es-AR')}
+            </span>
+
+            {hasVolumetric && (
+              <div style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 'bold', marginTop: '4px' }}>
+                Llevando por cantidad aplica: {promoDetails.badgeText}
+              </div>
+            )}
           </div>
+
           {product.descripcion && <p className="product-detail-description">{product.descripcion}</p>}
+
+
+
+          {/* Presentaciones Libres Panel */}
           {freeQuantity && freeCalculation && <section className="product-purchase-panel" aria-label="Configurar cantidad del producto">
-            <div className="presentation-price-grid">{validPresentations.map((presentation) => {
-              const isAdvantagePack = presentation.tipo === 'pack' && packHasAdvantage;
-              return <div className={`presentation-price-card ${isAdvantagePack ? 'is-best-value' : ''}`} key={presentation.id}>
-                <span className="presentation-price-label">{presentation.label}</span>
-                <strong>${presentation.precio.toLocaleString('es-AR')}</strong>
-                {isAdvantagePack && <small>Mejor precio por cantidad</small>}
-              </div>;
-            })}</div>
+            <div className="presentation-price-grid">
+              {validPresentations.map((presentation) => {
+                const isAdvantagePack = presentation.tipo === 'pack' && packHasAdvantage;
+                
+                // Calculate individual promo values for display
+                const originalVal = presentation.precio;
+                const presPromoDetails = getProductPromotionDetails(product, promotions, relations, presentation);
+                const hasPresPromo = presPromoDetails.hasPromotion && !presPromoDetails.isVolumetric;
+                const displayPromoPrice = hasPresPromo ? presPromoDetails.promoPrice : originalVal;
+
+                return (
+                  <div className={`presentation-price-card ${isAdvantagePack ? 'is-best-value' : ''}`} key={presentation.id}>
+                    <span className="presentation-price-label">{presentation.label}</span>
+                    {hasPresPromo && (
+                      <span className="price-old" style={{ fontSize: '0.7rem', display: 'block', textDecoration: 'line-through', opacity: '0.6' }}>
+                        ${originalVal.toLocaleString('es-AR')}
+                      </span>
+                    )}
+                    <strong>${displayPromoPrice.toLocaleString('es-AR')}</strong>
+                    {isAdvantagePack && <small>Mejor precio por cantidad</small>}
+                  </div>
+                );
+              })}
+            </div>
 
             <div className="purchase-section">
               <span className="purchase-section-title">Cantidad</span>
@@ -294,43 +429,169 @@ export default function ProductDetail() {
 
             <div className="purchase-summary">
               <h3>Resumen</h3>
-              {freeCalculation.completePacks > 0 && <div className="purchase-summary-row"><span><b>{freeCalculation.pack.label}</b><small>{freeCalculation.completePacks} × ${freeCalculation.pack.precio.toLocaleString('es-AR')}</small></span><strong>${freeCalculation.packSubtotal.toLocaleString('es-AR')}</strong></div>}
-              {freeCalculation.looseUnits > 0 && <div className="purchase-summary-row"><span><b>Unidades sueltas</b><small>{freeCalculation.looseUnits} × ${freeCalculation.unit.precio.toLocaleString('es-AR')}</small></span><strong>${freeCalculation.unitSubtotal.toLocaleString('es-AR')}</strong></div>}
-              <div className="purchase-summary-total"><span>Total</span><strong>${freeCalculation.total.toLocaleString('es-AR')}</strong></div>
+              {freeCalculation.completePacks > 0 && (
+                <div className="purchase-summary-row">
+                  <span>
+                    <b>{freeCalculation.pack.label}</b>
+                    <small>
+                      {freeCalculation.completePacks} × 
+                      {promoPackVal < freeCalculation.pack.precio && !hasVolumetric ? (
+                        <> <span style={{ textDecoration: 'line-through', opacity: '0.6' }}>${freeCalculation.pack.precio}</span> ${promoPackVal} </>
+                      ) : ` $${freeCalculation.pack.precio.toLocaleString('es-AR')}`}
+                    </small>
+                  </span>
+                  <strong>${finalFreePackSubtotal.toLocaleString('es-AR')}</strong>
+                </div>
+              )}
+              {freeCalculation.looseUnits > 0 && (
+                <div className="purchase-summary-row">
+                  <span>
+                    <b>Unidades sueltas</b>
+                    <small>
+                      {freeCalculation.looseUnits} × 
+                      {promoUnitVal < freeCalculation.unit.precio && !hasVolumetric ? (
+                        <> <span style={{ textDecoration: 'line-through', opacity: '0.6' }}>${freeCalculation.unit.precio}</span> ${promoUnitVal} </>
+                      ) : ` $${freeCalculation.unit.precio.toLocaleString('es-AR')}`}
+                    </small>
+                  </span>
+                  <strong>${finalFreeUnitSubtotal.toLocaleString('es-AR')}</strong>
+                </div>
+              )}
+              <div className="purchase-summary-total">
+                <span>Total</span>
+                <strong>${finalFreeTotal.toLocaleString('es-AR')}</strong>
+              </div>
             </div>
 
-            <motion.button whileTap={reduceMotion ? undefined : { scale: 0.985 }} transition={{ duration: reduceMotion ? 0 : 0.12 }} type="button" className="purchase-primary-button" disabled={!product.disponible} onClick={() => addConfiguredLine({
-              lineKey: buildCartLineKey(product.id, 'free'), productId: product.id, nombre: product.nombre, product, mode: 'free', presentationId: 'free', presentationLabel: 'Cantidad libre', quantity: totalUnits,
-              cantidadPacks: freeCalculation.completePacks, cantidadUnidadesSueltas: freeCalculation.looseUnits, cantidadUnidadesTotales: freeCalculation.totalUnits,
-              precioUnitario: freeCalculation.unit.precio, precioPresentacion: freeCalculation.pack?.precio || null, packSize: freeCalculation.pack?.cantidad_unidades || null,
-              subtotal: freeCalculation.total, breakdown: getReadableBreakdown(freeCalculation),
-            })}><ShoppingCart size={20} aria-hidden="true" /><span>Agregar al carrito</span></motion.button>
+            <motion.button 
+              whileTap={reduceMotion ? undefined : { scale: 0.985 }} 
+              transition={{ duration: reduceMotion ? 0 : 0.12 }} 
+              type="button" 
+              className="purchase-primary-button" 
+              disabled={!product.disponible} 
+              onClick={() => addConfiguredLine({
+                lineKey: buildCartLineKey(product.id, 'free'), 
+                productId: product.id, 
+                nombre: product.nombre, 
+                product, 
+                mode: 'free', 
+                presentationId: 'free', 
+                presentationLabel: 'Cantidad libre', 
+                quantity: totalUnits,
+                cantidadPacks: freeCalculation.completePacks, 
+                cantidadUnidadesSueltas: freeCalculation.looseUnits, 
+                cantidadUnidadesTotales: freeCalculation.totalUnits,
+                precioUnitario: freeCalculation.unit.precio, 
+                precioPresentacion: freeCalculation.pack?.precio || null, 
+                packSize: freeCalculation.pack?.cantidad_unidades || null,
+                subtotal: finalFreeTotal, 
+                breakdown: getReadableBreakdown(freeCalculation),
+              })}
+            >
+              <ShoppingCart size={20} aria-hidden="true" />
+              <span>Agregar al carrito</span>
+            </motion.button>
             {totalUnits > 1 && <p className="purchase-add-note">Se agregarán {totalUnits} unidades</p>}
           </section>}
 
+          {/* Presentaciones Packs Cerrados Panel */}
           {closedPacks && packCalculation && <section className="product-purchase-panel" aria-label="Elegir presentación y cantidad de packs">
-            <div className="purchase-section"><span className="purchase-section-title">Elegí una presentación</span><div className="pack-presentation-grid">{packPresentations.map((presentation) => {
-              const active = selectedPresentation.id === presentation.id;
-              return <button type="button" key={presentation.id} className={`pack-presentation-option ${active ? 'is-selected' : ''}`} aria-pressed={active} onClick={() => { setSelectedPresentationId(presentation.id); setPackCount((value) => Math.max(1, value)); }}><span><b>{presentation.label}</b><strong>${presentation.precio.toLocaleString('es-AR')}</strong></span>{active && <Check size={20} aria-label="Seleccionada" />}</button>;
-            })}</div></div>
+            <div className="purchase-section">
+              <span className="purchase-section-title">Elegí una presentación</span>
+              <div className="pack-presentation-grid">
+                {packPresentations.map((presentation) => {
+                  const active = selectedPresentation.id === presentation.id;
+                  const presPromoDetails = getProductPromotionDetails(product, promotions, relations, presentation);
+                  const hasPresPromo = presPromoDetails.hasPromotion && !presPromoDetails.isVolumetric;
+                  const displayPromoPrice = hasPresPromo ? presPromoDetails.promoPrice : presentation.precio;
 
-            <div className="purchase-section"><span className="purchase-section-title">Cantidad de packs</span><div className="quantity-control">
-              <button type="button" disabled={packCount === 1} onClick={() => setPackCount((value) => Math.max(1, value - 1))} aria-label="Disminuir cantidad de packs">−</button>
-              <span className="quantity-value"><strong>{packCount}</strong> {packCount === 1 ? 'pack' : 'packs'}</span>
-              <button type="button" onClick={() => setPackCount((value) => value + 1)} aria-label="Aumentar cantidad de packs">+</button>
-            </div></div>
+                  return (
+                    <button 
+                      type="button" 
+                      key={presentation.id} 
+                      className={`pack-presentation-option ${active ? 'is-selected' : ''}`} 
+                      aria-pressed={active} 
+                      onClick={() => { 
+                        setSelectedPresentationId(presentation.id); 
+                        setPackCount((value) => Math.max(1, value)); 
+                      }}
+                    >
+                      <span>
+                        <b>{presentation.label}</b>
+                        {hasPresPromo && (
+                          <span className="price-old" style={{ textDecoration: 'line-through', opacity: '0.6', fontSize: '0.75rem', marginRight: '6px' }}>
+                            ${presentation.precio.toLocaleString('es-AR')}
+                          </span>
+                        )}
+                        <strong>${displayPromoPrice.toLocaleString('es-AR')}</strong>
+                      </span>
+                      {active && <Check size={20} aria-label="Seleccionada" />}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
 
-            <div className="purchase-summary"><h3>Resumen</h3><div className="purchase-summary-row"><span><b>{selectedPresentation.label}</b><small>{packCalculation.packCount} {packCalculation.packCount === 1 ? 'pack' : 'packs'} · {packCalculation.totalUnits} unidades</small></span><strong>${packCalculation.total.toLocaleString('es-AR')}</strong></div><div className="purchase-summary-total"><span>Total</span><strong>${packCalculation.total.toLocaleString('es-AR')}</strong></div></div>
+            <div className="purchase-section">
+              <span className="purchase-section-title">Cantidad de packs</span>
+              <div className="quantity-control">
+                <button type="button" disabled={packCount === 1} onClick={() => setPackCount((value) => Math.max(1, value - 1))} aria-label="Disminuir cantidad de packs">−</button>
+                <span className="quantity-value"><strong>{packCount}</strong> {packCount === 1 ? 'pack' : 'packs'}</span>
+                <button type="button" onClick={() => setPackCount((value) => value + 1)} aria-label="Aumentar cantidad de packs">+</button>
+              </div>
+            </div>
 
-            <motion.button whileTap={reduceMotion ? undefined : { scale: 0.985 }} transition={{ duration: reduceMotion ? 0 : 0.12 }} type="button" className="purchase-primary-button" disabled={!product.disponible} onClick={() => addConfiguredLine({
-              lineKey: buildCartLineKey(product.id, selectedPresentation.id), productId: product.id, nombre: product.nombre, product, mode: 'packs', presentationId: selectedPresentation.id,
-              presentationLabel: selectedPresentation.label, quantity: packCalculation.packCount, cantidadPacks: packCalculation.packCount,
-              cantidadUnidadesTotales: packCalculation.totalUnits, cantidadUnidadesSueltas: 0, precioUnitario: null, precioPresentacion: selectedPresentation.precio,
-              subtotal: packCalculation.total, breakdown: getReadableBreakdown(packCalculation),
-            })}><ShoppingCart size={20} aria-hidden="true" /><span>Agregar al carrito</span></motion.button>
+            <div className="purchase-summary">
+              <h3>Resumen</h3>
+              <div className="purchase-summary-row">
+                <span>
+                  <b>{selectedPresentation.label}</b>
+                  <small>
+                    {packCalculation.packCount} {packCalculation.packCount === 1 ? 'pack' : 'packs'} · {packCalculation.totalUnits} unidades
+                    {finalPackTotal < packCalculation.total && (
+                      <> <span style={{ textDecoration: 'line-through', opacity: '0.6' }}>${packCalculation.total.toLocaleString('es-AR')}</span> </>
+                    )}
+                  </small>
+                </span>
+                <strong>${finalPackTotal.toLocaleString('es-AR')}</strong>
+              </div>
+              <div className="purchase-summary-total">
+                <span>Total</span>
+                <strong>${finalPackTotal.toLocaleString('es-AR')}</strong>
+              </div>
+            </div>
+
+            <motion.button 
+              whileTap={reduceMotion ? undefined : { scale: 0.985 }} 
+              transition={{ duration: reduceMotion ? 0 : 0.12 }} 
+              type="button" 
+              className="purchase-primary-button" 
+              disabled={!product.disponible} 
+              onClick={() => addConfiguredLine({
+                lineKey: buildCartLineKey(product.id, selectedPresentation.id), 
+                productId: product.id, 
+                nombre: product.nombre, 
+                product, 
+                mode: 'packs', 
+                presentationId: selectedPresentation.id,
+                presentationLabel: selectedPresentation.label, 
+                quantity: packCalculation.packCount, 
+                cantidadPacks: packCalculation.packCount,
+                cantidadUnidadesTotales: packCalculation.totalUnits, 
+                cantidadUnidadesSueltas: 0, 
+                precioUnitario: null, 
+                precioPresentacion: selectedPresentation.precio,
+                subtotal: finalPackTotal, 
+                breakdown: getReadableBreakdown(packCalculation),
+              })}
+            >
+              <ShoppingCart size={20} aria-hidden="true" />
+              <span>Agregar al carrito</span>
+            </motion.button>
             {packCalculation.totalUnits > 1 && <p className="purchase-add-note">Se agregarán {packCalculation.totalUnits} unidades en packs cerrados</p>}
           </section>}
 
+          {/* Tradicionales Panel */}
           {!hasPresentations && <div className="product-detail-action-container">
             <button
               type="button"

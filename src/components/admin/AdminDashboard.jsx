@@ -15,7 +15,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="admin-dashboard-layout">
+    <div className="admin-dashboard-layout admin-dashboard">
       {/* Mobile Top Header (only visible on mobile via CSS) */}
       <header className="admin-mobile-header">
         <div className="mobile-brand">
@@ -50,6 +50,12 @@ export default function AdminDashboard() {
             className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
           >
             🏷️ Categorías
+          </NavLink>
+          <NavLink 
+            to="/admin/campaigns" 
+            className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
+          >
+            📢 Campañas
           </NavLink>
         </nav>
         <div className="sidebar-footer">
@@ -88,6 +94,13 @@ export default function AdminDashboard() {
         >
           <span className="mobile-nav-icon">🏷️</span>
           <span className="mobile-nav-label">Categorías</span>
+        </NavLink>
+        <NavLink 
+          to="/admin/campaigns" 
+          className={({ isActive }) => `mobile-nav-link ${isActive ? 'active' : ''}`}
+        >
+          <span className="mobile-nav-icon">📢</span>
+          <span className="mobile-nav-label">Campañas</span>
         </NavLink>
       </nav>
     </div>
