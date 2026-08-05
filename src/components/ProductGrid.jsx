@@ -78,6 +78,14 @@ export default function ProductGrid({
   const [selectedSection, setSelectedSection] = useState('all');
 
   useEffect(() => {
+    const handleSelectSec = (e) => {
+      setSelectedSection(e.detail);
+    };
+    window.addEventListener('minhag-select-section', handleSelectSec);
+    return () => window.removeEventListener('minhag-select-section', handleSelectSec);
+  }, []);
+
+  useEffect(() => {
     if (loading || !pendingRestore || categoriesList.length === 0) return;
     const restoredCategory = pendingRestore.categorySlug === 'all'
       ? 'all'

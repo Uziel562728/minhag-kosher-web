@@ -37,5 +37,22 @@ export default function ProtectedRoute({ children }) {
     return <Navigate to="/admin/login" replace />;
   }
 
+  if (session.user?.app_metadata?.role !== 'admin') {
+    return (
+      <div className="admin-loading-container" style={{ textAlign: 'center', padding: '2rem' }}>
+        <h2 style={{ color: 'var(--text-danger)', marginBottom: '1rem' }}>Acceso No Autorizado</h2>
+        <p style={{ marginBottom: '1.5rem' }}>Tu cuenta no tiene privilegios de administrador para acceder a este panel.</p>
+        <button 
+          onClick={async () => {
+            await supabase.auth.signOut();
+          }} 
+          className="btn btn-primary"
+        >
+          Cerrar Sesión
+        </button>
+      </div>
+    );
+  }
+
   return children;
 }

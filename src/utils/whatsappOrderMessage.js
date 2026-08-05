@@ -12,9 +12,16 @@ export const pluralizePack = (quantity) => `${quantity} ${Number(quantity) === 1
 export const pluralizeUnit = (quantity) => `${quantity} ${Number(quantity) === 1 ? 'unidad' : 'unidades'}`;
 
 export function buildProductMessageBlock(item, index) {
-  const subtotal = item.mode === 'traditional'
-    ? Number(item.product.precio) * item.quantity
-    : item.subtotal;
+  const originalSub = Number(item.originalSubtotal !== undefined ? item.originalSubtotal : (
+    item.mode === 'traditional' ? Number(item.product.precio) * item.quantity : item.subtotal
+  ));
+  
+  const promoSub = Number(item.promoSubtotal !== undefined ? item.promoSubtotal : (
+    item.mode === 'traditional' ? Number(item.product.precio) * item.quantity : item.subtotal
+  ));
+
+  const discountAmt = originalSub - promoSub;
+
   const lines = [`*${index + 1}. ${item.product.nombre}*`];
 
   if (item.mode === 'free') {
@@ -28,7 +35,15 @@ export function buildProductMessageBlock(item, index) {
     lines.push(`• Cantidad: ${pluralizeUnit(item.quantity)}`);
   }
 
-  lines.push(`• Subtotal: *${formatCurrency(subtotal)}*`);
+  // Display pricing details with discounts if applicable
+  if (discountAmt > 0) {
+    lines.push(`• Subtotal original: ${formatCurrency(originalSub)}`);
+    lines.push(`• Descuento: -${formatCurrency(discountAmt)} (${item.badgeText || 'Promo'})`);
+    lines.push(`• Subtotal promocional: *${formatCurrency(promoSub)}*`);
+  } else {
+    lines.push(`• Subtotal: *${formatCurrency(originalSub)}*`);
+  }
+
   return lines;
 }
 
@@ -60,6 +75,23 @@ export function buildWhatsAppOrderMessage(orderData) {
     ? 'A coordinar'
     : 'No corresponde';
 
+  // Calculate totals and total saving
+  let totalOriginal = 0;
+  let totalPromo = 0;
+
+  orderData.cart.forEach(item => {
+    const originalSub = Number(item.originalSubtotal !== undefined ? item.originalSubtotal : (
+      item.mode === 'traditional' ? Number(item.product.precio) * item.quantity : item.subtotal
+    ));
+    const promoSub = Number(item.promoSubtotal !== undefined ? item.promoSubtotal : (
+      item.mode === 'traditional' ? Number(item.product.precio) * item.quantity : item.subtotal
+    ));
+    totalOriginal += originalSub;
+    totalPromo += promoSub;
+  });
+
+  const totalDiscount = totalOriginal - totalPromo;
+
   const lines = [
     '*NUEVO PEDIDO — MINHAG KOSHER*',
     '',
@@ -89,9 +121,16 @@ export function buildWhatsAppOrderMessage(orderData) {
     '*RESUMEN*',
     SEPARATOR,
     '',
-    `*Subtotal:* ${formatCurrency(orderData.cartTotal)}`,
+    `*Subtotal original:* ${formatCurrency(totalOriginal)}`
+  );
+
+  if (totalDiscount > 0) {
+    lines.push(`*Descuentos aplicados:* -${formatCurrency(totalDiscount)}`);
+  }
+
+  lines.push(
     `*Envío:* ${shippingText}`,
-    `*TOTAL:* *${formatCurrency(orderData.cartTotal)}*`,
+    `*TOTAL FINAL:* *${formatCurrency(totalPromo)}*`,
     '',
     '✅ Quedo a la espera de la confirmación.',
     '¡Muchas gracias!',
@@ -99,4 +138,3 @@ export function buildWhatsAppOrderMessage(orderData) {
 
   return lines.join('\n');
 }
-
